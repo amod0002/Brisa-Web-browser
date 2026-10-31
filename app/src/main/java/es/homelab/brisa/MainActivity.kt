@@ -101,7 +101,6 @@ class MainActivity : ComponentActivity(), TabHost {
     }
 }
 
-@Composable
 class UiState {
     var context by mutableStateOf<Pair<Tab, org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement>?>(null)
     var fullScreen by mutableStateOf(false)

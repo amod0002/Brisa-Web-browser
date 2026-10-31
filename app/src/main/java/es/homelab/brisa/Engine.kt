@@ -114,7 +114,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     /** Desplazamiento acumulado: la barra se encoge al bajar y vuelve al subir. */
     var scrollDelta by mutableIntStateOf(0)
 
-    val session = GeckoSession(
+    val session: GeckoSession = GeckoSession(
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     ).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
