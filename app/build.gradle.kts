@@ -35,8 +35,8 @@ android {
 }
 
 dependencies {
-    // Motor Gecko (Firefox). "+" = última estable publicada por Mozilla.
-    implementation("org.mozilla.geckoview:geckoview:+")
+    // Motor Gecko (Firefox). 145.x: compatible con AGP 8 y compileSdk 36.
+    implementation("org.mozilla.geckoview:geckoview:145.+")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
