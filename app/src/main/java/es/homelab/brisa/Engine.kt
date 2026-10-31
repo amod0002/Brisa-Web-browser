@@ -55,6 +55,13 @@ object Engine {
         }
     }
 
+    /** Sesión ya abierta y esperando: la siguiente pestaña nueva arranca sin esperar a Gecko. */
+    private var spare: GeckoSession? = null
+    fun takeSpare(ctx: Context): GeckoSession? = spare.also { spare = null; android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ warm(ctx) }, 1500) }
+    fun warm(ctx: Context) {
+        if (spare == null) spare = GeckoSession(GeckoSessionSettings.Builder().build()).apply { open(get(ctx)) }
+    }
+
     var builtIn: WebExtension? = null
         private set
     private val waiting = mutableListOf<(WebExtension) -> Unit>()
@@ -97,7 +104,9 @@ interface TabHost {
  * [restore]: estado guardado (historial atrás/adelante incluido).
  * [openNow] = false cuando Gecko nos pide una sesión para un enlace «abrir en ventana nueva»: él la abre.
  */
-class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true) {
+class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null) {
+    /** Grupo de pestañas (null = sin grupo). */
+    var group by mutableStateOf(group)
     var state: String? = restore
         private set
     var url by mutableStateOf(startUrl ?: "")
@@ -114,9 +123,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     /** Desplazamiento acumulado: la barra se encoge al bajar y vuelve al subir. */
     var scrollDelta by mutableIntStateOf(0)
 
-    val session: GeckoSession = GeckoSession(
+    val session: GeckoSession = ((if (!private && openNow) Engine.takeSpare(ctx) else null) ?: GeckoSession(
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
-    ).apply {
+    )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
@@ -161,7 +170,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
         promptDelegate = Prompts(ctx) { tabHost as? PromptHost }
         permissionDelegate = Permissions { tabHost as? PromptHost }
-        if (openNow) open(Engine.get(ctx)) else Engine.get(ctx)
+        if (openNow && !isOpen) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
         Engine.withBuiltIn { ext ->
             session.webExtensionController.setMessageDelegate(ext, object : WebExtension.MessageDelegate {

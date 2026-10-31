@@ -90,13 +90,21 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         runCatching {
             val a = org.json.JSONArray(tabsFile.readText())
             for (i in 0 until a.length()) a.getJSONObject(i).let {
-                tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null })
+                tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null },
+                    group = it.optString("group").ifEmpty { null })
             }
         }
         val incoming = intent?.dataString
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
         current = tabs.lastIndex
+        // Pantalla a la máxima frecuencia (90/120 Hz) y una pestaña nueva ya preparada
+        if (android.os.Build.VERSION.SDK_INT >= 30) display?.let { d ->
+            val now = d.mode
+            d.supportedModes.filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
+                .maxByOrNull { it.refreshRate }?.let { m -> window.attributes = window.attributes.apply { preferredDisplayModeId = m.modeId } }
+        }
+        window.decorView.postDelayed({ Engine.warm(this) }, 2000)
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(colorScheme = if (android.os.Build.VERSION.SDK_INT >= 31) { if (dark) dynamicDarkColorScheme(this) else dynamicLightColorScheme(this) } else if (dark) darkColorScheme() else lightColorScheme()) {
@@ -114,7 +122,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         super.onPause()
         val a = org.json.JSONArray()
         tabs.filter { !it.private && !it.isHome }.forEach {
-            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: ""))
+            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: ""))
         }
         runCatching { tabsFile.writeText(a.toString()) }
     }
@@ -257,10 +265,18 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
     var drag by remember { mutableFloatStateOf(0f) }
     val ctx = LocalContext.current
 
+    var remote by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(text, editing) {
+        remote = emptyList()
+        if (!editing || tab.private || !Settings.suggest || text.isBlank() || text.contains("://")) return@LaunchedEffect
+        kotlinx.coroutines.delay(200)
+        remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Settings.fetchSuggestions(text) }
+            .filter { !it.equals(text.trim(), ignoreCase = true) }
+    }
     if (editing && !tab.private) {
-        val hist = History.get(ctx).suggest(text)
+        val hist = History.get(ctx).suggest(text, max = if (remote.isEmpty()) 6 else 3)
         val current = tab.url.takeUnless { tab.isHome }
-        if (hist.isNotEmpty() || (current != null && text.isEmpty())) Column(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp))) {
+        if (hist.isNotEmpty() || remote.isNotEmpty() || (current != null && text.isEmpty())) Column(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp))) {
             if (current != null && text.isEmpty()) Row(Modifier.fillMaxWidth().clickable { text = current }.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 SiteIcon(tab.host, 28.dp, 6.dp)
@@ -278,6 +294,14 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
                         Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, color = glassContent())
                         Text(History.hostOf(e.url), maxLines = 1, fontSize = 12.sp, color = glassContentDim())
                     }
+                }
+            }
+            remote.forEach { q ->
+                Row(Modifier.fillMaxWidth().clickable { tab.load(q); setEditing(false) }.padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Search, null, Modifier.size(20.dp), tint = glassContentDim()) }
+                    Text(q, Modifier.weight(1f).padding(start = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, color = glassContent())
+                    Icon(Icons.Outlined.NorthWest, "Completar", Modifier.size(18.dp).clickable { text = q + " " }, tint = glassContentDim())
                 }
             }
         }
@@ -405,15 +429,27 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
 @Composable
 fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int) -> Unit, onNew: (Boolean) -> Unit, onDone: () -> Unit) {
     var privateView by remember { mutableStateOf(tabs.getOrNull(current)?.private == true) }
-    val shown = tabs.withIndex().filter { it.value.private == privateView }
+    // Grupo que se está viendo: null = todas
+    var groupView by remember { mutableStateOf(tabs.getOrNull(current)?.group) }
+    var grouping by remember { mutableStateOf<Tab?>(null) }
+    val groups = tabs.filter { !it.private }.mapNotNull { it.group }.distinct().sorted()
+    if (groupView != null && groupView !in groups) groupView = null
+    val shown = tabs.withIndex().filter { it.value.private == privateView && (privateView || groupView == null || it.value.group == groupView) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow).systemBarsPadding()) {
+        if (!privateView && groups.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(groupView == null, { groupView = null }, { Text("Todas") })
+            groups.forEach { g -> FilterChip(groupView == g, { groupView = g }, { Text("$g · ${tabs.count { it.group == g }}") }) }
+        }
+        grouping?.let { t -> GroupDialog(t, groups, { grouping = null }) { g -> t.group = g; if (g != null) groupView = g } }
         LazyVerticalGrid(GridCells.Adaptive(160.dp), Modifier.weight(1f), contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(shown.size) { k ->
                 val (i, t) = shown[k]
                 Column(Modifier.clip(RoundedCornerShape(16.dp))
                     .border(if (i == current) 3.dp else 0.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface).clickable { select(i) }) {
+                    .background(MaterialTheme.colorScheme.surface)
+                    .combinedClickableCompat({ select(i) }, { if (!t.private) grouping = t })) {
                     Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (!t.isHome) { SiteIcon(t.host, 18.dp, 4.dp); Spacer(Modifier.width(6.dp)) }
                         Text(t.title.ifBlank { if (t.isHome) "Inicio" else t.host }, Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -426,7 +462,7 @@ fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int)
             }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton({ onNew(privateView) }) { Icon(Icons.Filled.Add, "Nueva pestaña") }
+            IconButton({ onNew(privateView); if (!privateView) groupView?.let { g -> tabs.lastOrNull()?.group = g } }) { Icon(Icons.Filled.Add, "Nueva pestaña") }
             Spacer(Modifier.weight(1f))
             SingleChoiceSegmentedButtonRow {
                 SegmentedButton(privateView, { privateView = true }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("Privada") }
@@ -442,6 +478,7 @@ fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int)
 
 @Composable
 fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
+    val ctx = LocalContext.current
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 160.dp)) {
         if (private) Text("Navegación privada: no se guarda historial ni cookies al cerrar.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp))
         Text("Favoritos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -457,6 +494,24 @@ fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
                     }
                 }
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        if (!private) {
+            val freq = History.get(ctx).frequent(exclude = favs.list.map { History.hostOf(it.second) }.toSet())
+            if (freq.isNotEmpty()) {
+                Text("Visitados con frecuencia", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp, bottom = 12.dp))
+                freq.chunked(4).forEach { row ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                        row.forEach { e ->
+                            Column(Modifier.weight(1f).clickable { open(e.url) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                                SiteIcon(History.hostOf(e.url), 58.dp, 14.dp)
+                                Text(e.title.ifBlank { History.hostOf(e.url) }.substringBefore(" - ").substringBefore(" | "), fontSize = 12.sp, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
+                            }
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
             }
         }
     }
@@ -551,6 +606,13 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 placeholder = { Text("http://192.168.1.60:8888/search?q=%s") },
                 isError = custom.isNotEmpty() && !Settings.isValidTemplate(custom),
                 supportingText = { Text("Pon %s donde va lo que buscas") })
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Sugerencias de búsqueda")
+                    Text("Lo que escribes se envía a DuckDuckGo para sugerir búsquedas", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(Settings.suggest, { Settings.setSuggest(ctx, it) })
+            }
             Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {
                 Text(if (cleared) "Datos borrados" else "Borrar historial, cookies y caché")
@@ -638,4 +700,23 @@ fun DownloadsSheet(dismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** Mantener pulsada una pestaña: elegir grupo, crear uno nuevo o quitarla del grupo. */
+@Composable
+fun GroupDialog(tab: Tab, groups: List<String>, dismiss: () -> Unit, set: (String?) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = dismiss,
+        title = { Text("Grupo de la pestaña") },
+        text = { Column {
+            groups.forEach { g ->
+                Row(Modifier.fillMaxWidth().clickable { set(g); dismiss() }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(tab.group == g, null); Text(g, Modifier.padding(start = 8.dp))
+                }
+            }
+            OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
+                label = { Text("Grupo nuevo") }, placeholder = { Text("Homelab, Compras, Viaje…") })
+        } },
+        confirmButton = { TextButton({ if (name.isNotBlank()) { set(name.trim()); dismiss() } }, enabled = name.isNotBlank()) { Text("Crear") } },
+        dismissButton = { if (tab.group != null) TextButton({ set(null); dismiss() }) { Text("Quitar del grupo") } else TextButton(dismiss) { Text("Cancelar") } })
 }

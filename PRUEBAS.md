@@ -84,13 +84,24 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Los selectores de fecha/hora y los avisos del sistema siguen el tema claro/oscuro.
 - [ ] En Inicio, los últimos favoritos no quedan tapados por la barra.
 
-## 11. Android
+## 11. Novedades 0.7
+- [ ] Escribir en la barra: además del historial, salen hasta 4 sugerencias del buscador; la flecha ↖ completa el texto sin buscar.
+- [ ] Ajustes → Sugerencias de búsqueda apagado: solo sale el historial. En privadas nunca salen.
+- [ ] Inicio: «Visitados con frecuencia» con las webs que más abres (no repite los favoritos).
+- [ ] Mantener pulsada una pestaña en la cuadrícula → crear grupo «Homelab»; aparecen las pastillas «Todas / Homelab · 1».
+- [ ] Mover otra pestaña al grupo, filtrar por grupo, «Quitar del grupo».
+- [ ] Con un grupo seleccionado, «+» crea la pestaña dentro de ese grupo.
+- [ ] Los grupos se mantienen al cerrar y abrir la app.
+- [ ] Abrir pestaña nueva desde la cuadrícula o deslizando la barra: aparece al instante (pestaña precalentada).
+- [ ] Scroll a 120 Hz en el Pixel (Ajustes de Android → Pantalla → Pantalla fluida activada).
+
+## 12. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 12. Velocidad (comparar con Chrome)
+## 13. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

@@ -22,3 +22,14 @@ class SearchTest {
         org.junit.Assert.assertFalse(Settings.isValidTemplate("google.com"))
     }
 }
+
+class FrequentTest {
+    @Test fun agrupaPorDominio() {
+        val e = listOf(
+            History.Entry("https://elpais.com/a", "A", 1, 3), History.Entry("https://elpais.com/b", "B", 2, 2),
+            History.Entry("https://marca.com/", "M", 3, 1))
+        val freq = e.groupBy { History.hostOf(it.url) }.map { (_, l) -> l.maxBy { it.visits }.copy(visits = l.sumOf { it.visits }) }
+            .filter { it.visits >= 2 }
+        assertEquals(1, freq.size); assertEquals(5, freq[0].visits)
+    }
+}

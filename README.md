@@ -41,9 +41,17 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Colores claro/oscuro corregidos**: textos que salían en negro en modo oscuro, texto invisible en la barra privada y diálogos del sistema que no seguían el tema.
 - **Tocar la barra la deja vacía** para escribir; la página actual aparece arriba con un lápiz para editar su dirección.
 
+## 0.7.0
+- **Sugerencias del buscador** al escribir (DuckDuckGo; se pueden desactivar), con ↖ para completar.
+- **Visitados con frecuencia** en el Inicio.
+- **Grupos de pestañas**: mantener pulsada una pestaña para agruparla; pastillas para filtrar; se guardan.
+- **Velocidad**: pestaña nueva precalentada y pantalla a la frecuencia máxima (90/120 Hz).
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
-## Siguiente (0.7)
-Guardar y rellenar contraseñas, página de inicio con «Visitados con frecuencia» y ajustes de permisos por web.
+## Hoja de ruta hasta la 1.0
+- **0.8** · Guardar y rellenar contraseñas (cifradas con el almacén de claves de Android; compatible con Bitwarden/autorrelleno).
+- **0.9** · Permisos por web en Ajustes y sincronización opcional de favoritos/historial con un servicio en el homelab (Proxmox).
+- **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
