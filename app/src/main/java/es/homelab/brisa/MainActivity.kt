@@ -162,7 +162,9 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
         }
 
         var showHistory by remember { mutableStateOf(false) }
-        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true })
+        var showSettings by remember { mutableStateOf(false) }
+        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true })
+        if (showSettings) SettingsSheet { showSettings = false }
         if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
 
         AnimatedVisibility(showTabs, enter = fadeIn() + scaleIn(initialScale = 1.1f), exit = fadeOut() + scaleOut(targetScale = 1.1f)) {
@@ -199,7 +201,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
             hist.forEach { e ->
                 Row(Modifier.fillMaxWidth().clickable { tab.load(e.url); setEditing(false) }.padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.History, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SiteIcon(History.hostOf(e.url), 28.dp, 6.dp)
                     Column(Modifier.padding(start = 12.dp)) {
                         Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
                         Text(History.hostOf(e.url), maxLines = 1, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -229,6 +231,10 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
             if (text.isNotEmpty()) IconButton({ text = "" }) { Icon(Icons.Filled.Cancel, "Borrar", tint = tint) }
         } else {
             Text("aA", fontWeight = FontWeight.Medium, color = tint, modifier = Modifier.clickable(onClick = onMenu).padding(6.dp))
+            if (tab.readerable || tab.reading) IconButton({ tab.toggleReader() }, Modifier.size(36.dp)) {
+                Icon(Icons.Outlined.Description, if (tab.reading) "Salir del modo lectura" else "Modo lectura",
+                    tint = if (tab.reading) MaterialTheme.colorScheme.primary else tint, modifier = Modifier.size(20.dp))
+            }
             Row(Modifier.weight(1f).clickable { setEditing(true) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 if (tab.url.startsWith("https")) Icon(Icons.Filled.Lock, null, Modifier.size(14.dp), tint = tint)
                 Text(if (tab.isHome) "Buscar o escribir web" else tab.host, color = tint, maxLines = 1,
@@ -252,7 +258,7 @@ fun BasicTextFieldUrl(value: String, onChange: (String) -> Unit, modifier: Modif
 }
 
 @Composable
-fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit) {
+fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit, openSettings: () -> Unit) {
     val ctx = LocalContext.current
     var size by remember { mutableFloatStateOf(Engine.textSize(ctx)) }
     var ublock by remember { mutableStateOf<Boolean?>(null) }
@@ -268,6 +274,9 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
                 Text("${(size * 100).toInt()} %", Modifier.width(64.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 OutlinedButton({ size = (size + 0.1f).coerceAtMost(1.6f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 19.sp) }
             }
+            if (tab.readerable || tab.reading) ListItem(leadingContent = { Icon(Icons.Outlined.Description, null) },
+                headlineContent = { Text(if (tab.reading) "Salir del modo lectura" else "Modo lectura") },
+                modifier = Modifier.clickable { tab.toggleReader(); dismiss() })
             ListItem(leadingContent = { Icon(Icons.Outlined.Search, null) },
                 headlineContent = { Text("Buscar en la página") },
                 modifier = Modifier.clickable { tab.findText = ""; dismiss() })
@@ -296,6 +305,9 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
                 modifier = Modifier.clickable {
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(tab.url))) }; dismiss()
                 })
+            ListItem(leadingContent = { Icon(Icons.Outlined.Settings, null) },
+                headlineContent = { Text("Ajustes") },
+                modifier = Modifier.clickable { dismiss(); openSettings() })
         }
     }
 }
@@ -313,6 +325,7 @@ fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int)
                     .border(if (i == current) 3.dp else 0.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surface).clickable { select(i) }) {
                     Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!t.isHome) { SiteIcon(t.host, 18.dp, 4.dp); Spacer(Modifier.width(6.dp)) }
                         Text(t.title.ifBlank { if (t.isHome) "Inicio" else t.host }, Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         IconButton({ onClose(i) }, Modifier.size(36.dp)) { Icon(Icons.Filled.Close, "Cerrar", Modifier.size(16.dp)) }
                     }
@@ -349,9 +362,7 @@ fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 row.forEach { (name, url) ->
                     Column(Modifier.weight(1f).combinedClickableCompat({ open(url) }, { favs.toggle(name, url) }), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(58.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                            Text(name.take(1).uppercase(), fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
+                        SiteIcon(History.hostOf(url), 58.dp, 14.dp)
                         Text(name, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
                     }
                 }
@@ -414,6 +425,49 @@ fun HistorySheet(dismiss: () -> Unit, open: (String) -> Unit) {
                     supportingContent = { Text("${History.hostOf(e.url)} · ${fmt.format(java.util.Date(e.time))}", maxLines = 1) },
                     modifier = Modifier.clickable { open(e.url); dismiss() })
             }
+        }
+    }
+}
+
+/** Icono de la web (o su inicial) en un cuadrado redondeado. */
+@Composable
+fun SiteIcon(host: String, size: androidx.compose.ui.unit.Dp, corner: androidx.compose.ui.unit.Dp = 8.dp) {
+    val icon = WebIcons.get(LocalContext.current, host)
+    Box(Modifier.size(size).clip(RoundedCornerShape(corner)).background(
+        if (icon != null) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center) {
+        if (icon != null) Image(icon, null, Modifier.fillMaxSize(0.72f))
+        else Text(host.take(1).uppercase(), fontSize = (size.value * 0.42f).sp, fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+}
+
+@Composable
+fun SettingsSheet(dismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var custom by remember { mutableStateOf(Settings.search.takeIf { it !in Settings.engines.values } ?: "") }
+    var cleared by remember { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState())) {
+            Text("Ajustes", style = MaterialTheme.typography.titleLarge)
+            Text("Buscador", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            Settings.engines.forEach { (name, t) ->
+                Row(Modifier.fillMaxWidth().clickable { Settings.setSearch(ctx, t); custom = "" }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(Settings.search == t, { Settings.setSearch(ctx, t); custom = "" }); Text(name)
+                }
+            }
+            OutlinedTextField(custom, { custom = it; if (Settings.isValidTemplate(it)) Settings.setSearch(ctx, it) },
+                Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
+                label = { Text("Buscador propio (SearXNG…)") },
+                placeholder = { Text("http://192.168.1.60:8888/search?q=%s") },
+                isError = custom.isNotEmpty() && !Settings.isValidTemplate(custom),
+                supportingText = { Text("Pon %s donde va lo que buscas") })
+            Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+            OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {
+                Text(if (cleared) "Datos borrados" else "Borrar historial, cookies y caché")
+            }
+            Text("Brisa ${ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName} · motor Gecko",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
         }
     }
 }

@@ -12,6 +12,8 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebExtensionController
 import org.mozilla.geckoview.WebResponse
+import org.mozilla.geckoview.StorageController
+import org.json.JSONObject
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
 import org.mozilla.geckoview.GeckoSession
@@ -37,6 +39,10 @@ object Engine {
             .build()
     ).also { rt ->
         runtime = rt
+        Settings.load(ctx)
+        // Extensión propia (assets/extensions/brisa): iconos y modo lectura.
+        rt.webExtensionController.ensureBuiltIn("resource://android/assets/extensions/brisa/", "brisa@homelab.es")
+            .accept({ ext -> if (ext != null) { builtIn = ext; waiting.forEach { it(ext) }; waiting.clear() } }, { })
         // Las extensiones las instala el usuario desde el menú «aA»: se aceptan sin más diálogos.
         rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
@@ -47,6 +53,17 @@ object Engine {
                 ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
             ): GeckoResult<AllowOrDeny> = GeckoResult.fromValue(AllowOrDeny.ALLOW)
         }
+    }
+
+    var builtIn: WebExtension? = null
+        private set
+    private val waiting = mutableListOf<(WebExtension) -> Unit>()
+    fun withBuiltIn(cb: (WebExtension) -> Unit) { builtIn?.let(cb) ?: waiting.add(cb) }
+
+    /** Borra cookies, caché y datos de todas las webs, y el historial. */
+    fun clearData(ctx: Context, done: () -> Unit) {
+        History.get(ctx).clear()
+        get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
     }
 
     /** Tamaño del texto de las webs (0,8 – 1,6), para todas las pestañas. */
@@ -78,6 +95,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
     var blocked by mutableIntStateOf(0)
     var desktop by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
+    var readerable by mutableStateOf(false)
+    var reading by mutableStateOf(false)
+    private var port: WebExtension.Port? = null
     /** Desplazamiento acumulado: la barra se encoge al bajar y vuelve al subir. */
     var scrollDelta by mutableIntStateOf(0)
 
@@ -85,7 +105,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     ).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0 }
+            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100 }
         }
@@ -116,13 +136,41 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
             }
         }
         open(Engine.get(ctx))
+        val session = this
+        Engine.withBuiltIn { ext ->
+            session.webExtensionController.setMessageDelegate(ext, object : WebExtension.MessageDelegate {
+                override fun onConnect(p: WebExtension.Port) {
+                    port = p
+                    p.setDelegate(object : WebExtension.PortDelegate {
+                        override fun onPortMessage(msg: Any, p: WebExtension.Port) {
+                            val j = msg as? JSONObject ?: return
+                            when (j.optString("type")) {
+                                "page" -> {
+                                    readerable = j.optBoolean("readerable")
+                                    val h = History.hostOf(j.optString("url"))
+                                    j.optString("icon").takeIf { it.startsWith("http") }?.let { WebIcons.fetch(ctx, h, it) }
+                                }
+                                "reader" -> reading = j.optBoolean("ok")
+                            }
+                        }
+                        override fun onDisconnect(p: WebExtension.Port) { if (port === p) port = null }
+                    })
+                }
+            }, "brisa")
+        }
         if (!startUrl.isNullOrBlank()) loadUri(startUrl)
     }
 
     val isHome get() = url.isBlank() || url == "about:blank"
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
-    fun load(input: String) { session.loadUri(toUrl(input)) ; url = toUrl(input) }
+    fun load(input: String) { val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+
+    /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
+    fun toggleReader() {
+        if (reading) { reading = false; session.reload() }
+        else port?.postMessage(JSONObject().put("action", "reader"))
+    }
 
     fun toggleDesktop() {
         desktop = !desktop
@@ -152,13 +200,13 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
 
     companion object {
         /** Texto escrito → URL: dirección si lo parece, si no búsqueda en DuckDuckGo. */
-        fun toUrl(s: String): String {
+        fun toUrl(s: String, search: String = "https://duckduckgo.com/?q=%s"): String {
             val t = s.trim()
             return when {
                 t.matches(Regex("^[a-zA-Z]+://.*")) -> t
                 t.matches(Regex("^(\\d{1,3}\\.){3}\\d{1,3}(:\\d+)?(/.*)?$")) -> "http://$t"
                 !t.contains(' ') && t.contains('.') -> "https://$t"
-                else -> "https://duckduckgo.com/?q=" + java.net.URLEncoder.encode(t, "UTF-8")
+                else -> search.replace("%s", java.net.URLEncoder.encode(t, "UTF-8"))
             }
         }
     }

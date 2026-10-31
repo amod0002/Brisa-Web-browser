@@ -14,3 +14,11 @@ class UrlTest {
 class HistoryHostTest {
     @Test fun host() = assertEquals("elpais.com", History.hostOf("https://www.elpais.com/espana/"))
 }
+
+class SearchTest {
+    @Test fun searxng() = assertEquals("http://192.168.1.60:8888/search?q=gato", Tab.toUrl("gato", "http://192.168.1.60:8888/search?q=%s"))
+    @Test fun plantilla() {
+        org.junit.Assert.assertTrue(Settings.isValidTemplate("https://www.google.com/search?q=%s"))
+        org.junit.Assert.assertFalse(Settings.isValidTemplate("google.com"))
+    }
+}

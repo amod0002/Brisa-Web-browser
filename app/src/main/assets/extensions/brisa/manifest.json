@@ -1,0 +1,12 @@
+{
+  "manifest_version": 2,
+  "name": "Brisa",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "brisa@homelab.es" } },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["Readability-readerable.js", "Readability.js", "brisa.js"],
+    "run_at": "document_idle"
+  }],
+  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons", "<all_urls>"]
+}
