@@ -1,0 +1,2 @@
+-keep class org.mozilla.** { *; }
+-dontwarn org.mozilla.**
