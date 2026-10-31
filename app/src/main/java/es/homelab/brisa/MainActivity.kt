@@ -99,8 +99,9 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
         tabs += Tab(ctx, private, null); select(tabs.lastIndex); showTabs = false; editing = true
     }
 
-    BackHandler(showTabs || showMenu || editing || tab.canBack) {
+    BackHandler(showTabs || showMenu || editing || tab.findText != null || tab.canBack) {
         when {
+            tab.findText != null -> tab.endFind()
             showMenu -> showMenu = false
             editing -> editing = false
             showTabs -> showTabs = false
@@ -125,14 +126,15 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
             if (tab.progress < 100) LinearProgressIndicator(
                 progress = { tab.progress / 100f }, Modifier.fillMaxWidth().height(2.dp)
             )
-            AnimatedContent(collapsed && !editing && !tab.isHome, label = "bar") { small ->
+            AnimatedContent(collapsed && !editing && !tab.isHome && tab.findText == null, label = "bar") { small ->
                 if (small) {
                     Text(
                         tab.host, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth().clickable { collapsed = false }.padding(vertical = 8.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                } else Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                } else if (tab.findText != null) FindBar(tab)
+                else Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     AddressBar(tab, editing, { editing = it }, onMenu = { showMenu = true },
                         onSwipe = { dir ->
                             val n = current + dir
@@ -159,7 +161,9 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
             }
         }
 
-        if (showMenu) PageMenu(tab, { showMenu = false }) { newTab(private = true) }
+        var showHistory by remember { mutableStateOf(false) }
+        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true })
+        if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
 
         AnimatedVisibility(showTabs, enter = fadeIn() + scaleIn(initialScale = 1.1f), exit = fadeOut() + scaleOut(targetScale = 1.1f)) {
             TabGrid(tabs, current, select = { select(it); showTabs = false }, onClose = { i ->
@@ -186,6 +190,24 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         } else { fm.clearFocus(); keyboard?.hide() }
     }
     var drag by remember { mutableFloatStateOf(0f) }
+    val ctx = LocalContext.current
+
+    if (editing && !tab.private) {
+        val hist = History.get(ctx).suggest(text)
+        if (hist.isNotEmpty()) Column(Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            hist.forEach { e ->
+                Row(Modifier.fillMaxWidth().clickable { tab.load(e.url); setEditing(false) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.History, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
+                        Text(History.hostOf(e.url), maxLines = 1, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
 
     Row(
         Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp))
@@ -230,13 +252,39 @@ fun BasicTextFieldUrl(value: String, onChange: (String) -> Unit, modifier: Modif
 }
 
 @Composable
-fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit) {
+fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit) {
     val ctx = LocalContext.current
+    var size by remember { mutableFloatStateOf(Engine.textSize(ctx)) }
+    var ublock by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) { Engine.hasUblock(ctx) { ublock = it } }
     ModalBottomSheet(onDismissRequest = dismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             ListItem(leadingContent = { Icon(Icons.Outlined.Shield, null) },
                 headlineContent = { Text("${tab.blocked} rastreadores bloqueados") },
                 supportingContent = { Text("Protección estricta de Firefox") })
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Tamaño del texto", Modifier.weight(1f))
+                OutlinedButton({ size = (size - 0.1f).coerceAtLeast(0.8f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 13.sp) }
+                Text("${(size * 100).toInt()} %", Modifier.width(64.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                OutlinedButton({ size = (size + 0.1f).coerceAtMost(1.6f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 19.sp) }
+            }
+            ListItem(leadingContent = { Icon(Icons.Outlined.Search, null) },
+                headlineContent = { Text("Buscar en la página") },
+                modifier = Modifier.clickable { tab.findText = ""; dismiss() })
+            ListItem(leadingContent = { Icon(Icons.Outlined.History, null) },
+                headlineContent = { Text("Historial") },
+                modifier = Modifier.clickable { dismiss(); openHistory() })
+            ListItem(leadingContent = { Icon(Icons.Outlined.Extension, null) },
+                headlineContent = { Text(when (ublock) { true -> "uBlock Origin activo"; null -> "Extensiones…"; else -> "Instalar uBlock Origin" }) },
+                supportingContent = { Text("Bloqueador de anuncios") },
+                modifier = Modifier.clickable(enabled = ublock == false) {
+                    ublock = null
+                    android.widget.Toast.makeText(ctx, "Instalando uBlock Origin…", android.widget.Toast.LENGTH_SHORT).show()
+                    Engine.installUblock(ctx) { ok ->
+                        ublock = ok
+                        android.widget.Toast.makeText(ctx, if (ok) "uBlock Origin instalado" else "No se pudo instalar uBlock Origin", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                })
             ListItem(leadingContent = { Icon(Icons.Outlined.DesktopWindows, null) },
                 headlineContent = { Text(if (tab.desktop) "Versión móvil" else "Versión de escritorio") },
                 modifier = Modifier.clickable { tab.toggleDesktop(); dismiss() })
@@ -329,5 +377,43 @@ class Favorites(ctx: android.content.Context) {
     fun toggle(name: String, url: String) {
         list = if (has(url)) list.filter { it.second != url } else list + (name to url)
         prefs.edit().putString("l", list.joinToString("\n") { "${it.first}\t${it.second}" }).apply()
+    }
+}
+
+@Composable
+fun FindBar(tab: Tab) {
+    var q by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; focus.requestFocus() }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).height(46.dp).clip(RoundedCornerShape(14.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(start = 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        BasicTextFieldUrl(q, { q = it; tab.find(it) }, Modifier.weight(1f).focusRequester(focus)) { tab.find(q) }
+        Text(tab.findResult, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        IconButton({ tab.find(q, back = true) }) { Icon(Icons.Filled.KeyboardArrowUp, "Anterior") }
+        IconButton({ tab.find(q) }) { Icon(Icons.Filled.KeyboardArrowDown, "Siguiente") }
+        TextButton({ tab.endFind() }) { Text("OK") }
+    }
+}
+
+@Composable
+fun HistorySheet(dismiss: () -> Unit, open: (String) -> Unit) {
+    val h = History.get(LocalContext.current)
+    val fmt = remember { java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale("es")) }
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Historial", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            if (h.entries.isNotEmpty()) TextButton({ h.clear() }) { Text("Borrar todo") }
+        }
+        if (h.entries.isEmpty()) Text("Aún no hay historial.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(bottom = 16.dp)) {
+            items(h.entries.size) { i ->
+                val e = h.entries[i]
+                ListItem(headlineContent = { Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text("${History.hostOf(e.url)} · ${fmt.format(java.util.Date(e.time))}", maxLines = 1) },
+                    modifier = Modifier.clickable { open(e.url); dismiss() })
+            }
+        }
     }
 }

@@ -10,3 +10,7 @@ class UrlTest {
     @Test fun busqueda() = assertEquals("https://duckduckgo.com/?q=recetas+de+%C3%B1oquis", Tab.toUrl("recetas de ñoquis"))
     @Test fun espacios() = assertEquals("https://elpais.com", Tab.toUrl("  elpais.com  "))
 }
+
+class HistoryHostTest {
+    @Test fun host() = assertEquals("elpais.com", History.hostOf("https://www.elpais.com/espana/"))
+}

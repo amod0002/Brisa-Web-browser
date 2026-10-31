@@ -6,7 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.ContentBlocking
+import org.mozilla.geckoview.GeckoResult
+import org.mozilla.geckoview.WebExtension
+import org.mozilla.geckoview.WebExtensionController
+import org.mozilla.geckoview.WebResponse
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
 import org.mozilla.geckoview.GeckoSession
@@ -27,12 +32,44 @@ object Engine {
                     .build()
             )
             .aboutConfigEnabled(true)
+            .automaticFontSizeAdjustment(false)
+            .fontSizeFactor(ctx.getSharedPreferences("ajustes", 0).getFloat("texto", 1f))
             .build()
-    ).also { runtime = it }
+    ).also { rt ->
+        runtime = rt
+        // Las extensiones las instala el usuario desde el menú «aA»: se aceptan sin más diálogos.
+        rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
+            override fun onInstallPromptRequest(
+                ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
+            ): GeckoResult<WebExtension.PermissionPromptResponse> =
+                GeckoResult.fromValue(WebExtension.PermissionPromptResponse(true, true, false))
+            override fun onUpdatePrompt(
+                ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
+            ): GeckoResult<AllowOrDeny> = GeckoResult.fromValue(AllowOrDeny.ALLOW)
+        }
+    }
+
+    /** Tamaño del texto de las webs (0,8 – 1,6), para todas las pestañas. */
+    fun setTextSize(ctx: Context, f: Float) {
+        get(ctx).settings.setFontSizeFactor(f)
+        ctx.getSharedPreferences("ajustes", 0).edit().putFloat("texto", f).apply()
+    }
+    fun textSize(ctx: Context) = ctx.getSharedPreferences("ajustes", 0).getFloat("texto", 1f)
+
+    const val UBLOCK = "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
+    const val UBLOCK_ID = "uBlock0@raymondhill.net"
+
+    fun hasUblock(ctx: Context, cb: (Boolean) -> Unit) {
+        get(ctx).webExtensionController.list().accept({ l -> cb(l?.any { it.id == UBLOCK_ID } == true) }, { cb(false) })
+    }
+
+    fun installUblock(ctx: Context, done: (Boolean) -> Unit) {
+        get(ctx).webExtensionController.install(UBLOCK).accept({ done(true) }, { done(false) })
+    }
 }
 
 /** Una pestaña: su sesión Gecko y el estado que pinta la interfaz. */
-class Tab(ctx: Context, val private: Boolean, startUrl: String?) {
+class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
     var url by mutableStateOf(startUrl ?: "")
     var title by mutableStateOf("")
     var progress by mutableIntStateOf(100)
@@ -53,7 +90,16 @@ class Tab(ctx: Context, val private: Boolean, startUrl: String?) {
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100 }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
-            override fun onTitleChange(s: GeckoSession, t: String?) { title = t ?: "" }
+            override fun onTitleChange(s: GeckoSession, t: String?) {
+                title = t ?: ""; if (!private) History.get(ctx).title(url, title)
+            }
+            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.save(ctx, r) }
+        }
+        if (!private) historyDelegate = object : GeckoSession.HistoryDelegate {
+            override fun onVisited(s: GeckoSession, u: String, last: String?, flags: Int): GeckoResult<Boolean> {
+                if (flags and GeckoSession.HistoryDelegate.VISIT_TOP_LEVEL != 0) History.get(ctx).visit(u)
+                return GeckoResult.fromValue(true)
+            }
         }
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
@@ -86,6 +132,21 @@ class Tab(ctx: Context, val private: Boolean, startUrl: String?) {
             if (desktop) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE
         session.reload()
     }
+
+    // Buscar en la página
+    var findText by mutableStateOf<String?>(null)
+    var findResult by mutableStateOf("")
+    fun find(q: String, back: Boolean = false) {
+        if (q.isEmpty()) { session.finder.clear(); findResult = ""; return }
+        val flags = if (back) GeckoSession.FINDER_FIND_BACKWARDS else 0
+        val next = q == lastFind
+        lastFind = q
+        session.finder.find(if (next) null else q, flags).accept({ r ->
+            findResult = if (r == null || !r.found) "0/0" else "${r.current}/${r.total}"
+        }, { })
+    }
+    private var lastFind = ""
+    fun endFind() { session.finder.clear(); findText = null; findResult = ""; lastFind = "" }
 
     fun close() = session.close()
 
