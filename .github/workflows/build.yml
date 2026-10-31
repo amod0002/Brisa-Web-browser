@@ -9,7 +9,7 @@ jobs:
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v5
-        with: { gradle-version: 8.11.1 }
+        with: { gradle-version: 8.14.3 }
       - name: Firma desde secreto (si existe)
         if: env.KS != ''
         env: { KS: '${{ secrets.KEYSTORE_BASE64 }}' }
@@ -18,7 +18,7 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log || {
-            grep -E "^e: |What went wrong|Could not|error:|> " build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            grep -iE "^e: |requires|depends on|minCompileSdk|Could not|error:" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1; }
       - run: cp app/build/outputs/apk/release/app-release.apk brisa-${GITHUB_REF_NAME//\//-}.apk
       - uses: actions/upload-artifact@v4
