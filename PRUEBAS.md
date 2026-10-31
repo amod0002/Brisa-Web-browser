@@ -63,13 +63,24 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] «aA» → Descargas: progreso con MB, cancelar una descarga en curso, tocar una terminada la abre, «Limpiar lista».
 - [ ] La lista de descargas se conserva al reiniciar la app.
 
-## 9. Android
+## 9. Novedades 0.5 · ventanas de las webs y permisos
+- [ ] Desplegable `<select>` (p. ej. elegir provincia en un formulario): sale la lista y se marca la opción.
+- [ ] Selección múltiple y listas con grupos.
+- [ ] `alert`, `confirm` y `prompt` (probar en una web de pruebas como «javascript alert test»).
+- [ ] Campo de fecha y de hora: salen los selectores de Android.
+- [ ] Subir un archivo (foto a un formulario, o subir a Cloudreve web): se abre el selector y se sube.
+- [ ] Web con usuario/contraseña HTTP (router, Proxmox detrás de auth básica…): sale «Iniciar sesión».
+- [ ] Ubicación (Google Maps web → mi ubicación): primero el permiso de Brisa, luego el de Android.
+- [ ] Cámara/micrófono (webcamtests.com o Jitsi): pregunta, y con «Permitir» funciona.
+- [ ] «No permitir» en cualquiera de ellos: la web sigue funcionando sin cerrarse.
+
+## 10. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 10. Velocidad (comparar con Chrome)
+## 11. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

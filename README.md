@@ -32,9 +32,13 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - Las pestañas se **restauran con su historial** atrás/adelante (`pestanas.json`).
 - **Gestor de descargas** en «aA»: progreso, cancelar, abrir, limpiar lista.
 
+## 0.5.0
+- **Ventanas de las webs**: desplegables (incluidos múltiples y con grupos), avisos y confirmaciones, texto, fecha y hora, **subir archivos** y **usuario/contraseña HTTP**.
+- **Permisos** con diálogo propio: ubicación, notificaciones, cámara y micrófono (y después el permiso de Android). El sonido automático se bloquea; los vídeos mudos sí se reproducen.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
-## Siguiente (0.5)
-Permisos de las webs (cámara, micrófono, ubicación, notificaciones) con diálogo propio, rellenar contraseñas e inicios de sesión, deslizar desde el borde para atrás/adelante y página de inicio con «Leídos recientemente».
+## Siguiente (0.6)
+Guardar y rellenar contraseñas, página de inicio con «Visitados con frecuencia» y ajustes de permisos por web.

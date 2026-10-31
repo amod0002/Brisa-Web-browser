@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.GeckoView
 
-class MainActivity : ComponentActivity(), TabHost {
+class MainActivity : ComponentActivity(), TabHost, PromptHost {
     private val tabs = mutableStateListOf<Tab>()
     private var current by mutableIntStateOf(0)
     private val ui = UiState()
@@ -57,6 +57,25 @@ class MainActivity : ComponentActivity(), TabHost {
         val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
         c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (on) c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    }
+
+    // Ventanas de las webs, selector de archivos y permisos de Android
+    override fun show(d: Dialog) { ui.dialogs.add(d) }
+    private var filesCb: ((List<android.net.Uri>?) -> Unit)? = null
+    private val pickOne = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { u -> filesCb?.invoke(u?.let { listOf(it) }); filesCb = null }
+    private val pickMany = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) { l -> filesCb?.invoke(l); filesCb = null }
+    override fun pickFiles(mimes: Array<String>?, multiple: Boolean, cb: (List<android.net.Uri>?) -> Unit) {
+        filesCb?.invoke(null); filesCb = cb
+        val types = mimes?.filter { it.contains('/') }?.toTypedArray()?.takeIf { it.isNotEmpty() } ?: arrayOf("*/*")
+        if (multiple) pickMany.launch(types) else pickOne.launch(types)
+    }
+    private var permsCb: ((Boolean) -> Unit)? = null
+    private val askPerms = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        permsCb?.invoke(r.values.all { it }); permsCb = null
+    }
+    override fun androidPermissions(perms: Array<String>, cb: (Boolean) -> Unit) {
+        if (perms.all { checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { cb(true); return }
+        permsCb?.invoke(false); permsCb = cb; askPerms.launch(perms)
     }
 
     private val tabsFile get() = java.io.File(filesDir, "pestanas.json")
@@ -104,6 +123,7 @@ class MainActivity : ComponentActivity(), TabHost {
 class UiState {
     var context by mutableStateOf<Pair<Tab, org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement>?>(null)
     var fullScreen by mutableStateOf(false)
+    val dialogs = mutableStateListOf<Dialog>()
 }
 
 @Composable
@@ -194,6 +214,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         var showDownloads by remember { mutableStateOf(false) }
         if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true })
         if (showDownloads) DownloadsSheet { showDownloads = false }
+        ui.dialogs.toList().forEach { d -> key(d) { d { ui.dialogs.remove(d) } } }
         ui.context?.let { (t, e) ->
             LinkSheet(e, dismiss = { ui.context = null },
                 newTab = { u, priv ->

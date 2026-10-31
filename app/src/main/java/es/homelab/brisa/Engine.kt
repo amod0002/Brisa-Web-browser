@@ -159,6 +159,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 last = y
             }
         }
+        promptDelegate = Prompts(ctx) { tabHost as? PromptHost }
+        permissionDelegate = Permissions { tabHost as? PromptHost }
         if (openNow) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
         Engine.withBuiltIn { ext ->
