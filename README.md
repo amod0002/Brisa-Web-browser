@@ -25,9 +25,16 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Ajustes**: buscador (DuckDuckGo, Google, Startpage, Brave, Ecosia o uno propio como SearXNG con `%s`) y borrar historial, cookies y caché.
 - Extensión interna en `app/src/main/assets/extensions/brisa/` que comunica cada página con la app.
 
+## 0.4.0
+- **Mantener pulsado** un enlace o imagen: pestaña nueva o privada, copiar, compartir, abrir imagen.
+- Los enlaces que abren **ventana nueva** crean una pestaña al lado.
+- **Vídeo a pantalla completa** de verdad (sin barras); «atrás» sale.
+- Las pestañas se **restauran con su historial** atrás/adelante (`pestanas.json`).
+- **Gestor de descargas** en «aA»: progreso, cancelar, abrir, limpiar lista.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
-## Siguiente (0.4)
-Gestor de descargas dentro de la app, restaurar pestañas con su historial atrás/adelante, menú al mantener pulsado un enlace (abrir en pestaña nueva, copiar, compartir) y pantalla completa en vídeos.
+## Siguiente (0.5)
+Permisos de las webs (cámara, micrófono, ubicación, notificaciones) con diálogo propio, rellenar contraseñas e inicios de sesión, deslizar desde el borde para atrás/adelante y página de inicio con «Leídos recientemente».

@@ -45,16 +45,35 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.GeckoView
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), TabHost {
     private val tabs = mutableStateListOf<Tab>()
     private var current by mutableIntStateOf(0)
+    private val ui = UiState()
+
+    override fun openTab(tab: Tab) { tabs.add(current + 1, tab); current += 1 }
+    override fun contextMenu(tab: Tab, e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement) { ui.context = tab to e }
+    override fun fullScreen(on: Boolean) {
+        ui.fullScreen = on
+        val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (on) c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    }
+
+    private val tabsFile get() = java.io.File(filesDir, "pestanas.json")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Engine.get(this) // arranca el motor cuanto antes
-        val saved = getPreferences(MODE_PRIVATE).getString("tabs", "")!!.split('\n').filter { it.isNotBlank() }
-        saved.forEach { tabs += Tab(this, false, it) }
+        Tab.host = this
+        Downloads.load(this)
+        // Pestañas de la última vez, con su historial atrás/adelante
+        runCatching {
+            val a = org.json.JSONArray(tabsFile.readText())
+            for (i in 0 until a.length()) a.getJSONObject(i).let {
+                tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null })
+            }
+        }
         val incoming = intent?.dataString
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
@@ -62,7 +81,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(colorScheme = if (android.os.Build.VERSION.SDK_INT >= 31) { if (dark) dynamicDarkColorScheme(this) else dynamicLightColorScheme(this) } else if (dark) darkColorScheme() else lightColorScheme()) {
-                Browser(tabs, current, { current = it })
+                Browser(tabs, current, { current = it }, ui)
             }
         }
     }
@@ -74,13 +93,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        getPreferences(MODE_PRIVATE).edit()
-            .putString("tabs", tabs.filter { !it.private && !it.isHome }.joinToString("\n") { it.url }).apply()
+        val a = org.json.JSONArray()
+        tabs.filter { !it.private && !it.isHome }.forEach {
+            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: ""))
+        }
+        runCatching { tabsFile.writeText(a.toString()) }
     }
 }
 
 @Composable
-fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
+class UiState {
+    var context by mutableStateOf<Pair<Tab, org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement>?>(null)
+    var fullScreen by mutableStateOf(false)
+}
+
+@Composable
+fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, ui: UiState) {
     val ctx = LocalContext.current
     val tab = tabs[current.coerceIn(0, tabs.lastIndex)]
     var showTabs by remember { mutableStateOf(false) }
@@ -99,8 +127,9 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
         tabs += Tab(ctx, private, null); select(tabs.lastIndex); showTabs = false; editing = true
     }
 
-    BackHandler(showTabs || showMenu || editing || tab.findText != null || tab.canBack) {
+    BackHandler(ui.fullScreen || showTabs || showMenu || editing || tab.findText != null || tab.canBack) {
         when {
+            ui.fullScreen -> tab.session.exitFullScreen()
             tab.findText != null -> tab.endFind()
             showMenu -> showMenu = false
             editing -> editing = false
@@ -110,15 +139,15 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(Modifier.fillMaxSize().then(if (ui.fullScreen) Modifier else Modifier.statusBarsPadding())) {
             Box(Modifier.weight(1f)) {
                 AndroidView({ geckoView }, Modifier.fillMaxSize())
                 if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
             }
         }
 
-        // Barra inferior estilo Safari
-        Column(
+        // Barra inferior estilo Safari (oculta con vídeo a pantalla completa)
+        if (!ui.fullScreen) Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .navigationBarsPadding().imePadding()
@@ -163,7 +192,19 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit) {
 
         var showHistory by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
-        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true })
+        var showDownloads by remember { mutableStateOf(false) }
+        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true })
+        if (showDownloads) DownloadsSheet { showDownloads = false }
+        ui.context?.let { (t, e) ->
+            LinkSheet(e, dismiss = { ui.context = null },
+                newTab = { u, priv ->
+                    val nt = Tab(ctx, priv, u)
+                    tabs.add(tabs.indexOf(t) + 1, nt)
+                    if (priv) select(tabs.indexOf(nt))
+                    android.widget.Toast.makeText(ctx, if (priv) "Abierta en pestaña privada" else "Abierta en una pestaña nueva", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                open = { t.load(it) })
+        }
         if (showSettings) SettingsSheet { showSettings = false }
         if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
 
@@ -258,7 +299,7 @@ fun BasicTextFieldUrl(value: String, onChange: (String) -> Unit, modifier: Modif
 }
 
 @Composable
-fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit, openSettings: () -> Unit) {
+fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit, openSettings: () -> Unit, openDownloads: () -> Unit) {
     val ctx = LocalContext.current
     var size by remember { mutableFloatStateOf(Engine.textSize(ctx)) }
     var ublock by remember { mutableStateOf<Boolean?>(null) }
@@ -283,6 +324,10 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
             ListItem(leadingContent = { Icon(Icons.Outlined.History, null) },
                 headlineContent = { Text("Historial") },
                 modifier = Modifier.clickable { dismiss(); openHistory() })
+            ListItem(leadingContent = { Icon(Icons.Outlined.Download, null) },
+                headlineContent = { Text("Descargas") },
+                supportingContent = { Downloads.items.count { it.status == "Descargando" }.takeIf { it > 0 }?.let { Text("$it en curso") } },
+                modifier = Modifier.clickable { dismiss(); openDownloads() })
             ListItem(leadingContent = { Icon(Icons.Outlined.Extension, null) },
                 headlineContent = { Text(when (ublock) { true -> "uBlock Origin activo"; null -> "Extensiones…"; else -> "Instalar uBlock Origin" }) },
                 supportingContent = { Text("Bloqueador de anuncios") },
@@ -468,6 +513,85 @@ fun SettingsSheet(dismiss: () -> Unit) {
             }
             Text("Brisa ${ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName} · motor Gecko",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
+        }
+    }
+}
+
+/** Mantener pulsado un enlace o una imagen. */
+@Composable
+fun LinkSheet(e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement, dismiss: () -> Unit,
+              newTab: (String, Boolean) -> Unit, open: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val link = e.linkUri
+    val src = e.srcUri
+    val isImg = e.type == org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement.TYPE_IMAGE
+    fun copy(t: String) {
+        (ctx.getSystemService(android.content.ClipboardManager::class.java))
+            .setPrimaryClip(android.content.ClipData.newPlainText("enlace", t))
+    }
+    fun share(t: String) = ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t), null))
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Column(Modifier.padding(bottom = 24.dp)) {
+            Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                SiteIcon(History.hostOf(link ?: src ?: ""), 32.dp)
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text(e.title ?: e.altText ?: History.hostOf(link ?: src ?: ""), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                    Text(link ?: src ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            if (link != null) {
+                ListItem(leadingContent = { Icon(Icons.Outlined.Tab, null) }, headlineContent = { Text("Abrir en pestaña nueva") },
+                    modifier = Modifier.clickable { newTab(link, false); dismiss() })
+                ListItem(leadingContent = { Icon(Icons.Outlined.VisibilityOff, null) }, headlineContent = { Text("Abrir en pestaña privada") },
+                    modifier = Modifier.clickable { newTab(link, true); dismiss() })
+                ListItem(leadingContent = { Icon(Icons.Outlined.ContentCopy, null) }, headlineContent = { Text("Copiar enlace") },
+                    modifier = Modifier.clickable { copy(link); dismiss() })
+                ListItem(leadingContent = { Icon(Icons.Outlined.Share, null) }, headlineContent = { Text("Compartir enlace") },
+                    modifier = Modifier.clickable { share(link); dismiss() })
+            }
+            if (isImg && src != null) {
+                ListItem(leadingContent = { Icon(Icons.Outlined.Image, null) }, headlineContent = { Text("Abrir imagen") },
+                    modifier = Modifier.clickable { open(src); dismiss() })
+                ListItem(leadingContent = { Icon(Icons.Outlined.Link, null) }, headlineContent = { Text("Copiar dirección de la imagen") },
+                    modifier = Modifier.clickable { copy(src); dismiss() })
+            }
+        }
+    }
+}
+
+@Composable
+fun DownloadsSheet(dismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val fmt = remember { java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale("es")) }
+    fun mb(b: Long) = if (b < 0) "?" else if (b < 1_048_576) "${b / 1024} KB" else String.format(java.util.Locale("es"), "%.1f MB", b / 1_048_576.0)
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Descargas", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            if (Downloads.items.any { it.status != "Descargando" }) TextButton({ Downloads.clear(ctx) }) { Text("Limpiar lista") }
+        }
+        if (Downloads.items.isEmpty()) Text("Lo que descargues aparecerá aquí y en Descargas/Brisa.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(bottom = 16.dp)) {
+            items(Downloads.items.size) { i ->
+                val d = Downloads.items[i]
+                ListItem(
+                    leadingContent = { Icon(when {
+                        d.mime.startsWith("image") -> Icons.Outlined.Image
+                        d.mime.startsWith("video") -> Icons.Outlined.Movie
+                        d.mime.startsWith("audio") -> Icons.Outlined.MusicNote
+                        d.mime.contains("pdf") -> Icons.Outlined.PictureAsPdf
+                        else -> Icons.Outlined.Description }, null) },
+                    headlineContent = { Text(d.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = {
+                        if (d.status == "Descargando") Column {
+                            if (d.total > 0) LinearProgressIndicator({ d.done.toFloat() / d.total }, Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                            else LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                            Text("${mb(d.done)} de ${mb(d.total)}")
+                        } else Text(if (d.status == "Terminada") "${mb(d.total)} · ${fmt.format(java.util.Date(d.time))}" else d.status)
+                    },
+                    trailingContent = { if (d.status == "Descargando") IconButton({ d.cancel = true }) { Icon(Icons.Filled.Close, "Cancelar") } },
+                    modifier = Modifier.clickable(enabled = d.uri != null) { Downloads.open(ctx, d) })
+            }
         }
     }
 }

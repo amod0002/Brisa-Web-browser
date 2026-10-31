@@ -54,13 +54,22 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Ajustes → Buscador propio: con %s se aplica; sin %s se marca en rojo y no cambia.
 - [ ] Ajustes → Borrar historial, cookies y caché: se cierra la sesión de las webs y el historial queda vacío.
 
-## 8. Android
+## 8. Novedades 0.4
+- [ ] Mantener pulsado un enlace: abrir en pestaña nueva (se queda en segundo plano), en privada, copiar y compartir.
+- [ ] Mantener pulsada una imagen: abrir imagen y copiar su dirección.
+- [ ] Un enlace que abre ventana nueva (target=_blank, p. ej. resultados de Google con «abrir en pestaña nueva») crea una pestaña al lado.
+- [ ] Vídeo de YouTube a pantalla completa: se ocultan la barra y las del sistema; «atrás» sale de pantalla completa.
+- [ ] Cerrar la app del todo y volver: las pestañas vuelven y «atrás» recuerda las páginas anteriores de cada una.
+- [ ] «aA» → Descargas: progreso con MB, cancelar una descarga en curso, tocar una terminada la abre, «Limpiar lista».
+- [ ] La lista de descargas se conserva al reiniciar la app.
+
+## 9. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 9. Velocidad (comparar con Chrome)
+## 10. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

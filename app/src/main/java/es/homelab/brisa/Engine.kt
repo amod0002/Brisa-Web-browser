@@ -86,7 +86,20 @@ object Engine {
 }
 
 /** Una pestaña: su sesión Gecko y el estado que pinta la interfaz. */
-class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
+/** Lo que una pestaña necesita pedirle a la pantalla principal. */
+interface TabHost {
+    fun openTab(tab: Tab)
+    fun contextMenu(tab: Tab, e: GeckoSession.ContentDelegate.ContextElement)
+    fun fullScreen(on: Boolean)
+}
+
+/**
+ * [restore]: estado guardado (historial atrás/adelante incluido).
+ * [openNow] = false cuando Gecko nos pide una sesión para un enlace «abrir en ventana nueva»: él la abre.
+ */
+class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true) {
+    var state: String? = restore
+        private set
     var url by mutableStateOf(startUrl ?: "")
     var title by mutableStateOf("")
     var progress by mutableIntStateOf(100)
@@ -108,12 +121,17 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100 }
+            override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
             override fun onTitleChange(s: GeckoSession, t: String?) {
                 title = t ?: ""; if (!private) History.get(ctx).title(url, title)
             }
             override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.save(ctx, r) }
+            override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
+                if (e.linkUri != null || e.srcUri != null) host?.contextMenu(this@Tab, e)
+            }
+            override fun onFullScreen(s: GeckoSession, on: Boolean) { host?.fullScreen(on) }
         }
         if (!private) historyDelegate = object : GeckoSession.HistoryDelegate {
             override fun onVisited(s: GeckoSession, u: String, last: String?, flags: Int): GeckoResult<Boolean> {
@@ -124,6 +142,12 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
             override fun onCanGoForward(s: GeckoSession, v: Boolean) { canForward = v }
+            // Enlaces target=_blank y window.open: pestaña nueva junto a esta.
+            override fun onNewSession(s: GeckoSession, uri: String): GeckoResult<GeckoSession> {
+                val t = Tab(ctx, private, uri, openNow = false)
+                host?.openTab(t)
+                return GeckoResult.fromValue(t.session)
+            }
         }
         contentBlockingDelegate = object : ContentBlocking.Delegate {
             override fun onContentBlocked(s: GeckoSession, e: ContentBlocking.BlockEvent) { blocked++ }
@@ -135,7 +159,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
                 last = y
             }
         }
-        open(Engine.get(ctx))
+        if (openNow) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
         Engine.withBuiltIn { ext ->
             session.webExtensionController.setMessageDelegate(ext, object : WebExtension.MessageDelegate {
@@ -158,7 +182,10 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
                 }
             }, "brisa")
         }
-        if (!startUrl.isNullOrBlank()) loadUri(startUrl)
+        if (openNow) {
+            val st = restore?.let { runCatching { GeckoSession.SessionState.fromString(it) }.getOrNull() }
+            if (st != null) restoreState(st) else if (!startUrl.isNullOrBlank()) loadUri(startUrl)
+        }
     }
 
     val isHome get() = url.isBlank() || url == "about:blank"
@@ -199,6 +226,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?) {
     fun close() = session.close()
 
     companion object {
+        var host: TabHost? = null
         /** Texto escrito → URL: dirección si lo parece, si no búsqueda en DuckDuckGo. */
         fun toUrl(s: String, search: String = "https://duckduckgo.com/?q=%s"): String {
             val t = s.trim()
