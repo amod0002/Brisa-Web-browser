@@ -44,13 +44,23 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Descargar un PDF y un ZIP: aviso «Descargando…» y aparecen en Descargas/Brisa.
 - [ ] Descargar algo que necesita sesión (un archivo de Cloudreve con la sesión iniciada en Brisa).
 
-## 7. Android
+## 7. Novedades 0.3
+- [ ] En un artículo (elpais.com, una noticia) aparece el icono de lectura junto a «aA»; en portadas no.
+- [ ] Modo lectura: texto limpio con título, autor y minutos de lectura; tema claro/oscuro según el móvil.
+- [ ] Tocar otra vez el icono vuelve a la página original.
+- [ ] Los favoritos, las sugerencias y las pestañas muestran el icono real de cada web (la primera vez puede tardar un momento).
+- [ ] Webs del homelab sin icono: sale la inicial, sin errores.
+- [ ] Ajustes → Buscador: cambiar a Google y buscar algo; volver a DuckDuckGo.
+- [ ] Ajustes → Buscador propio: con %s se aplica; sin %s se marca en rojo y no cambia.
+- [ ] Ajustes → Borrar historial, cookies y caché: se cierra la sesión de las webs y el historial queda vacío.
+
+## 8. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 8. Velocidad (comparar con Chrome)
+## 9. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

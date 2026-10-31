@@ -19,9 +19,15 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Tamaño del texto** de las webs (80 – 160 %), se recuerda.
 - **uBlock Origin** de un toque desde «aA» (se descarga de addons.mozilla.org).
 
+## 0.3.0
+- **Modo lectura**: icono junto a «aA» en los artículos; texto limpio con título, autor y tiempo de lectura (Readability de Mozilla, Apache 2.0).
+- **Iconos reales** de cada web en favoritos, sugerencias y pestañas (los indica la propia página; caché de 7 días).
+- **Ajustes**: buscador (DuckDuckGo, Google, Startpage, Brave, Ecosia o uno propio como SearXNG con `%s`) y borrar historial, cookies y caché.
+- Extensión interna en `app/src/main/assets/extensions/brisa/` que comunica cada página con la app.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
-## Siguiente (0.3)
-Modo lectura, gestor de descargas dentro de la app, ajustes (buscador, página de inicio), iconos reales de las webs en favoritos y pestañas.
+## Siguiente (0.4)
+Gestor de descargas dentro de la app, restaurar pestañas con su historial atrás/adelante, menú al mantener pulsado un enlace (abrir en pestaña nueva, copiar, compartir) y pantalla completa en vídeos.
