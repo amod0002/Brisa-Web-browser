@@ -1,5 +1,5 @@
 name: Build APK
-on: { push: { branches: [main], tags: ['v*'] }, workflow_dispatch: {} }
+on: { push: { branches: [main, dev], tags: ['v*'] }, workflow_dispatch: {} }
 permissions: { contents: write }
 jobs:
   build:
@@ -17,8 +17,8 @@ jobs:
       - name: Compilar
         run: |
           set -o pipefail
-          gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log || {
-            grep -iE "^e: |requires|depends on|minCompileSdk|Could not|error:" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace 2>&1 | tee build.log || {
+            grep -iE "^e: |FAILED|expected:|requires|depends on|minCompileSdk|Could not|error:" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1; }
       - run: cp app/build/outputs/apk/release/app-release.apk brisa-${GITHUB_REF_NAME//\//-}.apk
       - uses: actions/upload-artifact@v4
