@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity(), TabHost {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Engine.get(this) // arranca el motor cuanto antes
-        Tab.host = this
+        Tab.tabHost = this
         Downloads.load(this)
         // Pestañas de la última vez, con su historial atrás/adelante
         runCatching {

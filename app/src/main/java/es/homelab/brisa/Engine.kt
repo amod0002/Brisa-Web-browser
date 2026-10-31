@@ -129,9 +129,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             }
             override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.save(ctx, r) }
             override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
-                if (e.linkUri != null || e.srcUri != null) host?.contextMenu(this@Tab, e)
+                if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }
-            override fun onFullScreen(s: GeckoSession, on: Boolean) { host?.fullScreen(on) }
+            override fun onFullScreen(s: GeckoSession, on: Boolean) { tabHost?.fullScreen(on) }
         }
         if (!private) historyDelegate = object : GeckoSession.HistoryDelegate {
             override fun onVisited(s: GeckoSession, u: String, last: String?, flags: Int): GeckoResult<Boolean> {
@@ -144,8 +144,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onCanGoForward(s: GeckoSession, v: Boolean) { canForward = v }
             // Enlaces target=_blank y window.open: pestaña nueva junto a esta.
             override fun onNewSession(s: GeckoSession, uri: String): GeckoResult<GeckoSession> {
-                val t = Tab(ctx, private, uri, openNow = false)
-                host?.openTab(t)
+                val t: Tab = Tab(ctx, private, uri, openNow = false)
+                tabHost?.openTab(t)
                 return GeckoResult.fromValue(t.session)
             }
         }
@@ -226,7 +226,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     fun close() = session.close()
 
     companion object {
-        var host: TabHost? = null
+        var tabHost: TabHost? = null
         /** Texto escrito → URL: dirección si lo parece, si no búsqueda en DuckDuckGo. */
         fun toUrl(s: String, search: String = "https://duckduckgo.com/?q=%s"): String {
             val t = s.trim()

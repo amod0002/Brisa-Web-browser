@@ -52,12 +52,12 @@ object Downloads {
 
     fun clear(ctx: Context) { items.removeAll { it.status != "Descargando" }; persist(ctx) }
 
-    fun open(ctx: Context, it: Item) {
-        val u = it.uri ?: return
+    fun open(ctx: Context, item: Item) {
+        val u = item.uri ?: return
         runCatching {
-            ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(u, it.mime)
+            ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(u, item.mime)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.onFailure { Toast.makeText(ctx, "No hay ninguna app para abrir ${it.name}", Toast.LENGTH_SHORT).show() }
+        }.onFailure { Toast.makeText(ctx, "No hay ninguna app para abrir ${item.name}", Toast.LENGTH_SHORT).show() }
     }
 
     fun save(ctx: Context, r: WebResponse) {
