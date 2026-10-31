@@ -74,13 +74,23 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Cámara/micrófono (webcamtests.com o Jitsi): pregunta, y con «Permitir» funciona.
 - [ ] «No permitir» en cualquiera de ellos: la web sigue funcionando sin cerrarse.
 
-## 10. Android
+## 10. Novedades 0.6 · cristal y correcciones
+- [ ] Modo claro y oscuro (cambiarlo con la app abierta): todos los textos se leen — Inicio, Favoritos, pestañas, menús, historial, descargas.
+- [ ] Pestaña privada: el texto que se escribe en la barra se ve (blanco sobre gris oscuro).
+- [ ] Barra flotante de cristal: cápsula de dirección y cápsula de botones separadas; la página se ve por debajo.
+- [ ] Al bajar, la barra se reduce a una cápsula pequeña con el dominio; al tocarla vuelve.
+- [ ] La línea de carga aparece dentro de la cápsula de dirección.
+- [ ] Tocar la barra: el campo sale vacío, listo para escribir; arriba aparece la página actual con un lápiz para editar su dirección.
+- [ ] Los selectores de fecha/hora y los avisos del sistema siguen el tema claro/oscuro.
+- [ ] En Inicio, los últimos favoritos no quedan tapados por la barra.
+
+## 11. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 11. Velocidad (comparar con Chrome)
+## 12. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

@@ -36,9 +36,14 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Ventanas de las webs**: desplegables (incluidos múltiples y con grupos), avisos y confirmaciones, texto, fecha y hora, **subir archivos** y **usuario/contraseña HTTP**.
 - **Permisos** con diálogo propio: ubicación, notificaciones, cámara y micrófono (y después el permiso de Android). El sonido automático se bloquea; los vídeos mudos sí se reproducen.
 
+## 0.6.0
+- **Estilo cristal (liquid glass)**: barra flotante en dos cápsulas translúcidas con brillo en el borde, cápsula mínima al hacer scroll y sugerencias en cristal. Android no deja desenfocar lo que pinta Gecko debajo, así que es translucidez calibrada, no desenfoque real.
+- **Colores claro/oscuro corregidos**: textos que salían en negro en modo oscuro, texto invisible en la barra privada y diálogos del sistema que no seguían el tema.
+- **Tocar la barra la deja vacía** para escribir; la página actual aparece arriba con un lápiz para editar su dirección.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
-## Siguiente (0.6)
+## Siguiente (0.7)
 Guardar y rellenar contraseñas, página de inicio con «Visitados con frecuencia» y ajustes de permisos por web.

@@ -1,0 +1,5 @@
+<resources>
+    <style name="Brisa" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

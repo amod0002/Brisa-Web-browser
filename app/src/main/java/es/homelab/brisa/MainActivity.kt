@@ -157,7 +157,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface) {
+    Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().then(if (ui.fullScreen) Modifier else Modifier.statusBarsPadding())) {
             Box(Modifier.weight(1f)) {
                 AndroidView({ geckoView }, Modifier.fillMaxSize())
@@ -168,28 +169,25 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         // Barra inferior estilo Safari (oculta con vídeo a pantalla completa)
         if (!ui.fullScreen) Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .navigationBarsPadding().imePadding()
+                .navigationBarsPadding().imePadding().padding(horizontal = 12.dp).padding(bottom = 8.dp)
         ) {
-            if (tab.progress < 100) LinearProgressIndicator(
-                progress = { tab.progress / 100f }, Modifier.fillMaxWidth().height(2.dp)
-            )
             AnimatedContent(collapsed && !editing && !tab.isHome && tab.findText == null, label = "bar") { small ->
-                if (small) {
-                    Text(
-                        tab.host, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().clickable { collapsed = false }.padding(vertical = 8.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                if (small) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(Modifier.glass(RoundedCornerShape(50), tint = if (tab.private) PrivateGlass else null)
+                        .clickable { collapsed = false }.padding(horizontal = 18.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (tab.url.startsWith("https")) Icon(Icons.Filled.Lock, null, Modifier.size(12.dp), tint = glassContentDim(tab.private))
+                        Text(tab.host, fontSize = 13.sp, color = glassContent(tab.private), modifier = Modifier.padding(start = 4.dp))
+                    }
                 } else if (tab.findText != null) FindBar(tab)
-                else Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                else Column {
                     AddressBar(tab, editing, { editing = it }, onMenu = { showMenu = true },
                         onSwipe = { dir ->
                             val n = current + dir
                             if (n in tabs.indices) select(n) else if (n == tabs.size) newTab()
                         })
-                    if (!editing) Row(
-                        Modifier.fillMaxWidth().padding(top = 6.dp),
+                    if (!editing) CompositionLocalProvider(LocalContentColor provides glassContent()) { Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp).glass(RoundedCornerShape(26.dp)).padding(vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         IconButton({ tab.session.goBack() }, enabled = tab.canBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") }
@@ -202,9 +200,11 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
                         }
                         IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) }) {
-                            Badge { Text("${tabs.size}") }
+                            Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                                Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
-                    }
+                    } }
                 }
             }
         }
@@ -237,10 +237,12 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
     }
 }
+}
 
 @Composable
 fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu: () -> Unit, onSwipe: (Int) -> Unit) {
-    var text by remember(editing) { mutableStateOf(if (editing) tab.url.takeUnless { tab.isHome } ?: "" else "") }
+    // Al tocar la barra se empieza en blanco; la dirección actual queda como sugerencia «Editar» por si se quiere retocar.
+    var text by remember(editing) { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     val fm = LocalFocusManager.current
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -257,24 +259,33 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
 
     if (editing && !tab.private) {
         val hist = History.get(ctx).suggest(text)
-        if (hist.isNotEmpty()) Column(Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        val current = tab.url.takeUnless { tab.isHome }
+        if (hist.isNotEmpty() || (current != null && text.isEmpty())) Column(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp))) {
+            if (current != null && text.isEmpty()) Row(Modifier.fillMaxWidth().clickable { text = current }.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                SiteIcon(tab.host, 28.dp, 6.dp)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(tab.title.ifBlank { tab.host }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, color = glassContent())
+                    Text(current, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = glassContentDim())
+                }
+                Icon(Icons.Outlined.Edit, "Editar dirección", Modifier.size(20.dp), tint = glassContentDim())
+            }
             hist.forEach { e ->
                 Row(Modifier.fillMaxWidth().clickable { tab.load(e.url); setEditing(false) }.padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     SiteIcon(History.hostOf(e.url), 28.dp, 6.dp)
                     Column(Modifier.padding(start = 12.dp)) {
-                        Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
-                        Text(History.hostOf(e.url), maxLines = 1, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(e.title.ifBlank { History.hostOf(e.url) }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, color = glassContent())
+                        Text(History.hostOf(e.url), maxLines = 1, fontSize = 12.sp, color = glassContentDim())
                     }
                 }
             }
         }
     }
 
+    Box(contentAlignment = Alignment.BottomCenter) {
     Row(
-        Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp))
-            .background(if (tab.private) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceContainerHighest)
+        Modifier.fillMaxWidth().height(50.dp).glass(RoundedCornerShape(25.dp), tint = if (tab.private) PrivateGlass else null)
             .pointerInput(tab) {
                 detectHorizontalDragGestures(onDragEnd = {
                     if (drag < -120) onSwipe(1) else if (drag > 120) onSwipe(-1); drag = 0f
@@ -283,10 +294,11 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val tint = if (tab.private) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        val tint = glassContentDim(tab.private)
+        val strong = glassContent(tab.private)
         if (editing) {
             Icon(Icons.Outlined.Search, null, tint = tint)
-            BasicTextFieldUrl(text, { text = it }, Modifier.weight(1f).focusRequester(focus).onFocusChanged { if (it.isFocused) hadFocus = true else if (hadFocus && editing) setEditing(false) }) {
+            BasicTextFieldUrl(text, { text = it }, color = strong, placeholder = if (tab.isHome) "Buscar o escribir web" else tab.host, modifier = Modifier.weight(1f).focusRequester(focus).onFocusChanged { if (it.isFocused) hadFocus = true else if (hadFocus && editing) setEditing(false) }) {
                 if (text.isNotBlank()) tab.load(text); setEditing(false)
             }
             if (text.isNotEmpty()) IconButton({ text = "" }) { Icon(Icons.Filled.Cancel, "Borrar", tint = tint) }
@@ -298,20 +310,33 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
             }
             Row(Modifier.weight(1f).clickable { setEditing(true) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 if (tab.url.startsWith("https")) Icon(Icons.Filled.Lock, null, Modifier.size(14.dp), tint = tint)
-                Text(if (tab.isHome) "Buscar o escribir web" else tab.host, color = tint, maxLines = 1,
+                Text(if (tab.isHome) "Buscar o escribir web" else tab.host, color = if (tab.isHome) tint else strong, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp))
             }
             if (tab.progress < 100) IconButton({ tab.session.stop() }) { Icon(Icons.Filled.Close, "Detener", tint = tint) }
             else IconButton({ tab.session.reload() }, enabled = !tab.isHome) { Icon(Icons.Filled.Refresh, "Recargar", tint = tint) }
         }
     }
+    // Progreso de carga: una línea fina dentro de la cápsula
+    if (tab.progress < 100 && !editing) LinearProgressIndicator({ tab.progress / 100f },
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 3.dp).height(2.dp).clip(RoundedCornerShape(1.dp)),
+        trackColor = androidx.compose.ui.graphics.Color.Transparent)
+    }
 }
 
 @Composable
-fun BasicTextFieldUrl(value: String, onChange: (String) -> Unit, modifier: Modifier, onGo: () -> Unit) {
+fun BasicTextFieldUrl(value: String, onChange: (String) -> Unit, modifier: Modifier,
+                     color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+                     placeholder: String? = null, onGo: () -> Unit) {
     androidx.compose.foundation.text.BasicTextField(
         value, onChange, modifier.padding(horizontal = 8.dp), singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty() && placeholder != null) Text(placeholder, color = color.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                inner()
+            }
+        },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = color),
         cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onGo = { onGo() })
@@ -417,7 +442,7 @@ fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int)
 
 @Composable
 fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 160.dp)) {
         if (private) Text("Navegación privada: no se guarda historial ni cookies al cerrar.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp))
         Text("Favoritos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
@@ -461,11 +486,10 @@ fun FindBar(tab: Tab) {
     var q by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; focus.requestFocus() }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).height(46.dp).clip(RoundedCornerShape(14.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(start = 10.dp),
+    Row(Modifier.fillMaxWidth().height(50.dp).glass(RoundedCornerShape(25.dp)).padding(start = 12.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        BasicTextFieldUrl(q, { q = it; tab.find(it) }, Modifier.weight(1f).focusRequester(focus)) { tab.find(q) }
+        BasicTextFieldUrl(q, { q = it; tab.find(it) }, Modifier.weight(1f).focusRequester(focus), color = glassContent(), placeholder = "Buscar en la página") { tab.find(q) }
         Text(tab.findResult, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         IconButton({ tab.find(q, back = true) }) { Icon(Icons.Filled.KeyboardArrowUp, "Anterior") }
         IconButton({ tab.find(q) }) { Icon(Icons.Filled.KeyboardArrowDown, "Siguiente") }
