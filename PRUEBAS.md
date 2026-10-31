@@ -34,13 +34,23 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Versión de escritorio / móvil recarga la página en ese modo.
 - [ ] Nueva pestaña privada y Abrir en otra app.
 
-## 6. Android
+## 6. Novedades 0.2
+- [ ] Al escribir en la barra salen sugerencias del historial; tocar una la abre.
+- [ ] Las pestañas privadas no guardan historial ni muestran sugerencias.
+- [ ] «aA» → Historial: lista con fecha; abrir una entrada; «Borrar todo».
+- [ ] «aA» → Buscar en la página: contador (3/12), flechas arriba/abajo, «atrás» u OK cierran.
+- [ ] «aA» → Tamaño del texto: A− / A+ cambia la letra de las webs y se recuerda al reabrir.
+- [ ] «aA» → Instalar uBlock Origin: aviso de instalado; después pone «uBlock Origin activo» y desaparecen anuncios (probar marca.com).
+- [ ] Descargar un PDF y un ZIP: aviso «Descargando…» y aparecen en Descargas/Brisa.
+- [ ] Descargar algo que necesita sesión (un archivo de Cloudreve con la sesión iniciada en Brisa).
+
+## 7. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 7. Velocidad (comparar con Chrome)
+## 8. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
