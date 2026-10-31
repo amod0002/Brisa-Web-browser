@@ -176,7 +176,15 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
     var text by remember(editing) { mutableStateOf(if (editing) tab.url.takeUnless { tab.isHome } ?: "" else "") }
     val focus = remember { FocusRequester() }
     val fm = LocalFocusManager.current
-    LaunchedEffect(editing) { if (editing) focus.requestFocus() else fm.clearFocus() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // Solo se cierra al PERDER el foco después de haberlo tenido; el aviso inicial «sin foco» se ignora.
+    var hadFocus by remember(editing) { mutableStateOf(false) }
+    LaunchedEffect(editing) {
+        if (editing) {
+            androidx.compose.runtime.withFrameNanos { } // esperar a que el campo exista
+            focus.requestFocus(); keyboard?.show()
+        } else { fm.clearFocus(); keyboard?.hide() }
+    }
     var drag by remember { mutableFloatStateOf(0f) }
 
     Row(
@@ -193,7 +201,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         val tint = if (tab.private) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
         if (editing) {
             Icon(Icons.Outlined.Search, null, tint = tint)
-            BasicTextFieldUrl(text, { text = it }, Modifier.weight(1f).focusRequester(focus).onFocusChanged { if (!it.isFocused && editing) setEditing(false) }) {
+            BasicTextFieldUrl(text, { text = it }, Modifier.weight(1f).focusRequester(focus).onFocusChanged { if (it.isFocused) hadFocus = true else if (hadFocus && editing) setEditing(false) }) {
                 if (text.isNotBlank()) tab.load(text); setEditing(false)
             }
             if (text.isNotEmpty()) IconButton({ text = "" }) { Icon(Icons.Filled.Cancel, "Borrar", tint = tint) }

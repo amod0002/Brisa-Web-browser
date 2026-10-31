@@ -6,6 +6,7 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 
 ## 1. Arranque y barra
 - [ ] La app abre en menos de 2 s y muestra el Inicio.
+- [ ] Tocar la barra abre el teclado y el campo de búsqueda (desde Inicio y desde una página).
 - [ ] Escribir una dirección (`wikipedia.org`) la abre.
 - [ ] Escribir una búsqueda (`recetas de ñoquis`) abre DuckDuckGo.
 - [ ] Escribir una IP del homelab (`192.168.1.x:8006`) abre Proxmox (aviso de certificado si es autofirmado).
