@@ -18,6 +18,7 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace 2>&1 | tee build.log || {
+            set +e   # el diagnóstico no debe cortarse si un grep no encuentra nada
             grep -E "^e: " build.log | head -10 | while IFS= read -r l; do echo "::error::$l"; done
             # Registro completo en la rama ci-log (se sobrescribe en cada fallo)
             mkdir -p /tmp/log && tail -c 400000 build.log > /tmp/log/build.log && cd /tmp/log && git init -q -b ci-log \
