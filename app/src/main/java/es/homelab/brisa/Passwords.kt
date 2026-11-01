@@ -55,7 +55,7 @@ object Passwords : Autocomplete.StorageDelegate {
         logins = runCatching { parse(decrypt(file.readBytes())) }.getOrDefault(emptyList())
     }
 
-    fun setOfferSave(v: Boolean) { offerSave = v; prefs.edit().putBoolean("ofrecer", v).apply() }
+    fun changeOfferSave(v: Boolean) { offerSave = v; prefs.edit().putBoolean("ofrecer", v).apply() }
     fun addNever(host: String) { never = never + host; prefs.edit().putStringSet("nunca", never).apply() }
     fun removeNever(host: String) { never = never - host; prefs.edit().putStringSet("nunca", never).apply() }
 

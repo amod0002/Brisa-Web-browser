@@ -649,7 +649,7 @@ fun SettingsSheet(dismiss: () -> Unit) {
             if (showPw) PasswordsSheet { showPw = false }
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Ofrecer guardar contraseñas", Modifier.weight(1f))
-                Switch(Passwords.offerSave, { Passwords.setOfferSave(it) })
+                Switch(Passwords.offerSave, { Passwords.changeOfferSave(it) })
             }
             Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {
