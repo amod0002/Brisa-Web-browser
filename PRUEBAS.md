@@ -95,13 +95,21 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Abrir pestaña nueva desde la cuadrícula o deslizando la barra: aparece al instante (pestaña precalentada).
 - [ ] Scroll a 120 Hz en el Pixel (Ajustes de Android → Pantalla → Pantalla fluida activada).
 
-## 12. Android
+## 12. Novedades 0.7.1 · velocidad de carga
+- [ ] Primer arranque tras instalar: a los pocos segundos sale «Bloqueador de anuncios activado»; «aA» muestra «uBlock Origin activo».
+- [ ] Comparar con la 0.7.0 / Chrome: elpais.com, marca.com, 20minutos.es cargan más rápido y sin anuncios.
+- [ ] Con 5+ pestañas abiertas, una web nueva carga igual de rápido que con una sola pestaña.
+- [ ] Un vídeo en una pestaña de fondo se pausa al cambiar de pestaña y sigue al volver.
+- [ ] Al reabrir la app con muchas pestañas: solo carga la visible; las demás cargan al entrar en ellas (con su «atrás» intacto).
+- [ ] El icono de modo lectura sigue apareciendo en los artículos (puede tardar un segundo más).
+
+## 13. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 13. Velocidad (comparar con Chrome)
+## 14. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

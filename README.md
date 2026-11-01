@@ -47,6 +47,12 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Grupos de pestañas**: mantener pulsada una pestaña para agruparla; pastillas para filtrar; se guardan.
 - **Velocidad**: pestaña nueva precalentada y pantalla a la frecuencia máxima (90/120 Hz).
 
+## 0.7.1 · velocidad de carga
+- **uBlock Origin se instala solo** en el primer arranque (una vez; se puede quitar).
+- **Solo la pestaña visible trabaja**: las de fondo se pausan y no compiten por red ni procesador.
+- **Restauración diferida**: al reabrir la app solo carga la pestaña visible.
+- La comprobación de modo lectura espera a que el móvil esté libre.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.

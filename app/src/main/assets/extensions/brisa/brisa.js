@@ -10,9 +10,14 @@
     return links.length ? links[0].href : location.origin + "/favicon.ico";
   }
 
-  let readerable = false;
-  try { readerable = isProbablyReaderable(document); } catch (e) {}
-  port.postMessage({ type: "page", url: location.href, icon: bestIcon(), readerable });
+  // Icono enseguida; la comprobación de modo lectura cuando el móvil esté libre, para no frenar la carga.
+  port.postMessage({ type: "page", url: location.href, icon: bestIcon(), readerable: false });
+  const check = () => {
+    let readerable = false;
+    try { readerable = isProbablyReaderable(document); } catch (e) {}
+    if (readerable) port.postMessage({ type: "page", url: location.href, icon: bestIcon(), readerable });
+  };
+  if ("requestIdleCallback" in window) requestIdleCallback(check, { timeout: 3000 }); else setTimeout(check, 1500);
 
   port.onMessage.addListener(msg => {
     if (msg.action !== "reader") return;

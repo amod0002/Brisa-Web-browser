@@ -87,6 +87,16 @@ object Engine {
         get(ctx).webExtensionController.list().accept({ l -> cb(l?.any { it.id == UBLOCK_ID } == true) }, { cb(false) })
     }
 
+    /** Primer arranque: instala uBlock Origin sin preguntar (es lo que más acelera la carga). Solo se intenta una vez. */
+    fun autoUblock(ctx: Context, done: (Boolean) -> Unit) {
+        val p = ctx.getSharedPreferences("ajustes", 0)
+        if (p.getBoolean("ublock_auto", false)) return
+        hasUblock(ctx) { has ->
+            if (has) { p.edit().putBoolean("ublock_auto", true).apply(); return@hasUblock }
+            installUblock(ctx) { ok -> if (ok) p.edit().putBoolean("ublock_auto", true).apply(); done(ok) }
+        }
+    }
+
     fun installUblock(ctx: Context, done: (Boolean) -> Unit) {
         get(ctx).webExtensionController.install(UBLOCK).accept({ done(true) }, { done(false) })
     }
@@ -104,7 +114,11 @@ interface TabHost {
  * [restore]: estado guardado (historial atrás/adelante incluido).
  * [openNow] = false cuando Gecko nos pide una sesión para un enlace «abrir en ventana nueva»: él la abre.
  */
-class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null) {
+class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null,
+          lazy: Boolean = false) {
+    /** Pestaña restaurada que aún no se ha cargado: se carga la primera vez que se muestra. */
+    private var pending: (() -> Unit)? = null
+    fun wake() { pending?.let { pending = null; it() } }
     /** Grupo de pestañas (null = sin grupo). */
     var group by mutableStateOf(group)
     var state: String? = restore
@@ -194,15 +208,18 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             }, "brisa")
         }
         if (openNow) {
-            val st = restore?.let { runCatching { GeckoSession.SessionState.fromString(it) }.getOrNull() }
-            if (st != null) restoreState(st) else if (!startUrl.isNullOrBlank()) loadUri(startUrl)
+            val go = {
+                val st = restore?.let { runCatching { GeckoSession.SessionState.fromString(it) }.getOrNull() }
+                if (st != null) restoreState(st) else if (!startUrl.isNullOrBlank()) loadUri(startUrl)
+            }
+            if (lazy) pending = go else go()
         }
     }
 
     val isHome get() = url.isBlank() || url == "about:blank"
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
-    fun load(input: String) { val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+    fun load(input: String) { pending = null; val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
 
     /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
     fun toggleReader() {

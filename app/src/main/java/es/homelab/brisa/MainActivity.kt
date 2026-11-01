@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
             val a = org.json.JSONArray(tabsFile.readText())
             for (i in 0 until a.length()) a.getJSONObject(i).let {
                 tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null },
-                    group = it.optString("group").ifEmpty { null })
+                    group = it.optString("group").ifEmpty { null }, lazy = true)
             }
         }
         val incoming = intent?.dataString
@@ -105,6 +105,11 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
                 .maxByOrNull { it.refreshRate }?.let { m -> window.attributes = window.attributes.apply { preferredDisplayModeId = m.modeId } }
         }
         window.decorView.postDelayed({ Engine.warm(this) }, 2000)
+        window.decorView.postDelayed({
+            Engine.autoUblock(this) { ok ->
+                if (ok) android.widget.Toast.makeText(this, "Bloqueador de anuncios activado: las webs cargarán más rápido", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }, 3000)
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(colorScheme = if (android.os.Build.VERSION.SDK_INT >= 31) { if (dark) dynamicDarkColorScheme(this) else dynamicLightColorScheme(this) } else if (dark) darkColorScheme() else lightColorScheme()) {
@@ -118,8 +123,14 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         intent.dataString?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
     }
 
+    override fun onResume() {
+        super.onResume()
+        tabs.getOrNull(current)?.session?.setActive(true)
+    }
+
     override fun onPause() {
         super.onPause()
+        tabs.forEach { it.session.setActive(false) }
         val a = org.json.JSONArray()
         tabs.filter { !it.private && !it.isHome }.forEach {
             a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: ""))
@@ -145,7 +156,12 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     val geckoView = remember { GeckoView(ctx) }
     val favs = remember { Favorites(ctx) }
 
-    LaunchedEffect(tab) { geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false }
+    LaunchedEffect(tab) {
+        geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
+        tab.session.setActive(true); tab.wake()
+        // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
+        tabs.forEach { if (it !== tab) it.session.setActive(false) }
+    }
     LaunchedEffect(tab.scrollDelta) {
         if (tab.scrollDelta > 8) collapsed = true else if (tab.scrollDelta < -8) collapsed = false
     }
