@@ -1,5 +1,6 @@
 package es.homelab.brisa
 
+import androidx.compose.material.icons.outlined.LockOpen
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue

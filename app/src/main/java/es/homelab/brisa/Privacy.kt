@@ -15,6 +15,13 @@ import org.mozilla.geckoview.WebExtension
  * lo que Gecko no ofrece (banners de cookies, WebRTC) lo hace la extensión interna.
  */
 object Privacy {
+    val DOH = linkedMapOf(
+        "Quad9" to "https://dns.quad9.net/dns-query",
+        "Mullvad" to "https://dns.mullvad.net/dns-query",
+        "Mullvad (sin anuncios)" to "https://adblock.dns.mullvad.net/dns-query",
+        "Cloudflare" to "https://mozilla.cloudflare-dns.com/dns-query",
+    )
+
     // Solo HTTPS: 0 = no, 1 = solo en privadas, 2 = siempre
     var httpsOnly by mutableIntStateOf(2); private set
     // DNS cifrado: 0 = no, 1 = automático (si falla, DNS normal), 2 = estricto
@@ -27,12 +34,6 @@ object Privacy {
     var webrtc by mutableStateOf(true); private set
     var clearOnExit by mutableStateOf(false); private set
 
-    val DOH = linkedMapOf(
-        "Quad9" to "https://dns.quad9.net/dns-query",
-        "Mullvad" to "https://dns.mullvad.net/dns-query",
-        "Mullvad (sin anuncios)" to "https://adblock.dns.mullvad.net/dns-query",
-        "Cloudflare" to "https://mozilla.cloudflare-dns.com/dns-query",
-    )
 
     /** Parámetros de rastreo que se quitan de las direcciones. */
     val STRIP = arrayOf(
