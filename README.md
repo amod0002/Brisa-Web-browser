@@ -75,6 +75,13 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Escudo por web**: desactivar la protección de Gecko solo en una web que falle.
 - **Pestañas privadas bloqueadas** con huella/PIN al volver a la app (opcional, activado por defecto).
 
+## 0.9.2 · motor y herramientas al día
+- **GeckoView 159** (antes 145): un año de parches de seguridad de Mozilla, más velocidad y compatibilidad.
+- **Android Gradle Plugin 9.1** con Kotlin integrado, **Kotlin 2.4**, **Gradle 9.8**, compilación contra **Android 37** (`targetSdk` sigue en 35).
+- Acciones de GitHub en Node 24 (`upload-artifact@v6`).
+- **Aviso mensual** (`.github/workflows/gecko.yml`): si Mozilla publica una GeckoView nueva, abre un issue. Funciona desde `main` (a partir de la 1.0).
+- Si una compilación falla, el registro completo queda en la rama `ci-log`.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.

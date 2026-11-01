@@ -141,13 +141,19 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] La vista «Privada» de la cuadrícula también queda bloqueada; las normales no.
 - [ ] Ajustes → «Bloquear pestañas privadas» apagado: no se bloquean.
 
-## 16. Android
+## 16. Novedades 0.9.2 · Gecko 159
+- [ ] Instalar encima de la 0.9.1: se conservan pestañas, favoritos, historial, contraseñas y ajustes.
+- [ ] uBlock Origin sigue activo y los avisos de cookies se siguen rechazando.
+- [ ] En «aA» → Ajustes aparece la versión 0.9.2.
+- [ ] Repaso rápido: YouTube (vídeo y pantalla completa), Google Maps, un login del homelab, una descarga y el modo lectura.
+
+## 17. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 17. Velocidad (comparar con Chrome)
+## 18. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
