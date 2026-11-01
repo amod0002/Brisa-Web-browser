@@ -1,0 +1,26 @@
+name: Comprobar Gecko
+# Cada mes mira si Mozilla ha publicado una GeckoView más nueva que la que usa Brisa
+# y, si es así, abre un aviso (issue) en el repositorio. Las tareas programadas solo
+# se ejecutan desde la rama principal (main), así que empezará a funcionar con la 1.0.
+on:
+  schedule: [{ cron: "17 7 1 * *" }]
+  workflow_dispatch: {}
+permissions: { issues: write, contents: read }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Comparar versiones
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          actual=$(grep -oP 'geckoview:geckoview:\K[0-9.]+' app/build.gradle.kts)
+          ultima=$(curl -s https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/maven-metadata.xml \
+            | grep -oP '<release>\K[^<]+')
+          echo "Brisa usa $actual · última publicada $ultima"
+          if [ -n "$ultima" ] && [ "$ultima" != "$actual" ]; then
+            titulo="Actualizar GeckoView a ${ultima%%.*}"
+            if ! gh issue list --state open --search "$titulo in:title" --json number --jq '.[0]' | grep -q number; then
+              gh issue create --title "$titulo" --body "Brisa usa GeckoView \`$actual\` y Mozilla ha publicado \`$ultima\`. Las versiones nuevas traen parches de seguridad: conviene actualizar en \`dev\` y repasar PRUEBAS.md."
+            fi
+          fi

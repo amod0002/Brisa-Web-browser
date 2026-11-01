@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -11,8 +10,8 @@ android {
         applicationId = "es.homelab.brisa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.9.1"
+        versionCode = 13
+        versionName = "0.9.2"
         // Solo arm64: el Pixel no necesita más y el APK pesa la mitad
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -30,17 +29,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
 }
 
 dependencies {
-    // Motor Gecko (Firefox). 145.x: compatible con AGP 8 y compileSdk 36.
-    implementation("org.mozilla.geckoview:geckoview:145.+")
+    // Motor Gecko (Firefox). Versión exacta: la comprueba cada mes .github/workflows/gecko.yml
+    implementation("org.mozilla.geckoview:geckoview:159.0.20261022150525")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.11.0")
-    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     testImplementation("junit:junit:4.13.2")
 }
