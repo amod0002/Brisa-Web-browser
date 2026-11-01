@@ -91,6 +91,8 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         permsCb?.invoke(false); permsCb = cb; askPerms.launch(perms)
     }
 
+    // Atajos de teclado: hay que verlos antes que la web (GeckoView tiene el foco). Uso deliberado.
+    @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(e: android.view.KeyEvent): Boolean {
         if (e.action == android.view.KeyEvent.ACTION_DOWN && (e.isCtrlPressed || e.isAltPressed)) {
             val c = e.keyCode
