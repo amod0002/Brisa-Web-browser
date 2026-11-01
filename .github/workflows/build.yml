@@ -18,10 +18,12 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace 2>&1 | tee build.log || {
-            # GitHub solo muestra 10 avisos por paso: el motivo va en uno solo, con saltos de línea codificados
-            { grep -E "^e: " build.log | head -15; sed -n '/What went wrong/,/\* Try/p' build.log | head -40; } \
-              | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > err.txt
-            echo "::error::$(cat err.txt)"
+            grep -E "^e: " build.log | head -10 | while IFS= read -r l; do echo "::error::$l"; done
+            # Registro completo en la rama ci-log (se sobrescribe en cada fallo)
+            mkdir -p /tmp/log && tail -c 400000 build.log > /tmp/log/build.log && cd /tmp/log && git init -q -b ci-log \
+              && git -c user.name=ci -c user.email=ci@localhost add build.log \
+              && git -c user.name=ci -c user.email=ci@localhost commit -qm "Registro de ${GITHUB_SHA::7}" \
+              && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-log || true
             exit 1; }
       - run: cp app/build/outputs/apk/release/app-release.apk brisa-${GITHUB_REF_NAME//\//-}.apk
       - uses: actions/upload-artifact@v6
