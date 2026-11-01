@@ -418,8 +418,6 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
                 }
             }
         }
-    }
-
     } }
     if (!dropDown) suggestionsUi()
 
