@@ -219,6 +219,11 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 last = y
             }
         }
+        // Tablet: las webs se piden en versión de escritorio (la pantalla ya es ancha, así que el viewport sigue siendo el del dispositivo)
+        if (Settings.isTablet && Settings.desktopTablet) {
+            desktop = true
+            settings.userAgentMode = GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
+        }
         promptDelegate = Prompts(ctx) { tabHost as? PromptHost }
         permissionDelegate = Permissions { tabHost as? PromptHost }
         if (openNow && !isOpen) open(Engine.get(ctx)) else Engine.get(ctx)
@@ -268,8 +273,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         desktop = !desktop
         session.settings.userAgentMode =
             if (desktop) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE
+        // En tablet la pantalla ya es ancha: solo se cambia el «user agent», no el ancho de la página
         session.settings.viewportMode =
-            if (desktop) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE
+            if (desktop && !Settings.isTablet) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE
         session.reload()
     }
 

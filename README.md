@@ -82,6 +82,13 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Aviso mensual** (`.github/workflows/gecko.yml`): si Mozilla publica una GeckoView nueva, abre un issue. Funciona desde `main` (a partir de la 1.0).
 - Si una compilación falla, el registro completo queda en la rama `ci-log`.
 
+## 0.9.3 · tablets
+- **Diseño de tablet** (ancho mínimo ≥ 600 dp y ventana ancha): barra arriba con dirección centrada y **tira de pestañas**; sugerencias desplegadas hacia abajo. En pantalla dividida estrecha vuelve el diseño de móvil.
+- **Webs de escritorio por defecto en tablet** (como el iPad), cambiable por web en «aA» y en Ajustes.
+- **Inicio adaptado**: 5–8 favoritos por fila y contenido centrado.
+- **Atajos de teclado**: Ctrl+T/W/L/F/R/D, Ctrl+Tab, Ctrl+1…9, Ctrl+Mayús+N, Alt+←/→, F5.
+- Girar, plegar o redimensionar la ventana no recarga la página.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.

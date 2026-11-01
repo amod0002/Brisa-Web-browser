@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +89,30 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     override fun androidPermissions(perms: Array<String>, cb: (Boolean) -> Unit) {
         if (perms.all { checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { cb(true); return }
         permsCb?.invoke(false); permsCb = cb; askPerms.launch(perms)
+    }
+
+    override fun dispatchKeyEvent(e: android.view.KeyEvent): Boolean {
+        if (e.action == android.view.KeyEvent.ACTION_DOWN && (e.isCtrlPressed || e.isAltPressed)) {
+            val c = e.keyCode
+            val k = when {
+                e.isCtrlPressed && e.isShiftPressed && c == android.view.KeyEvent.KEYCODE_N -> "privada"
+                e.isCtrlPressed && e.isShiftPressed && c == android.view.KeyEvent.KEYCODE_TAB -> "anterior"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_TAB -> "siguiente"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_T -> "nueva"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_W -> "cerrar"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_L -> "barra"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_F -> "buscar"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_R -> "recargar"
+                e.isCtrlPressed && c == android.view.KeyEvent.KEYCODE_D -> "favorito"
+                e.isCtrlPressed && c in android.view.KeyEvent.KEYCODE_1..android.view.KeyEvent.KEYCODE_9 -> "pestaña:${c - android.view.KeyEvent.KEYCODE_1}"
+                e.isAltPressed && c == android.view.KeyEvent.KEYCODE_DPAD_LEFT -> "atras"
+                e.isAltPressed && c == android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> "adelante"
+                else -> null
+            }
+            if (k != null && ui.shortcut?.invoke(k) == true) return true
+        }
+        if (e.action == android.view.KeyEvent.ACTION_DOWN && e.keyCode == android.view.KeyEvent.KEYCODE_F5 && ui.shortcut?.invoke("recargar") == true) return true
+        return super.dispatchKeyEvent(e)
     }
 
     private val tabsFile get() = java.io.File(filesDir, "pestanas.json")
@@ -172,6 +197,8 @@ class UiState {
     var fullScreen by mutableStateOf(false)
     val dialogs = mutableStateListOf<Dialog>()
     var privateLocked by mutableStateOf(false)
+    /** Atajos de teclado: los recibe la actividad y los resuelve la pantalla. */
+    var shortcut: ((String) -> Boolean)? = null
     fun unlockPrivate(ctx: android.content.Context) {
         (ctx as? PromptHost)?.unlock("Ver tus pestañas privadas") { ok -> if (ok) privateLocked = false } ?: run { privateLocked = false }
     }
@@ -201,6 +228,36 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     fun newTab(private: Boolean = false) {
         tabs += Tab(ctx, private, null); select(tabs.lastIndex); showTabs = false; editing = true
     }
+    fun closeTab(i: Int) {
+        if (i !in tabs.indices) return
+        tabs[i].close(); tabs.removeAt(i)
+        if (tabs.isEmpty()) tabs += Tab(ctx, false, null)
+        select((if (i < current) current - 1 else current).coerceIn(0, tabs.lastIndex))
+    }
+
+    // Diseño de tablet: pantalla de tablet y ventana ancha (en pantalla dividida estrecha vuelve el de móvil)
+    val conf = androidx.compose.ui.platform.LocalConfiguration.current
+    val wide = conf.smallestScreenWidthDp >= 600 && conf.screenWidthDp >= 600
+
+    SideEffect {
+        ui.shortcut = { k ->
+            when {
+                k == "nueva" -> newTab()
+                k == "privada" -> newTab(private = true)
+                k == "cerrar" -> closeTab(current)
+                k == "barra" -> { showTabs = false; editing = true }
+                k == "buscar" -> if (!tab.isHome) tab.findText = ""
+                k == "recargar" -> tab.session.reload()
+                k == "atras" -> tab.session.goBack()
+                k == "adelante" -> tab.session.goForward()
+                k == "favorito" -> if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url)
+                k == "siguiente" -> select((current + 1) % tabs.size)
+                k == "anterior" -> select((current - 1 + tabs.size) % tabs.size)
+                k.startsWith("pestaña:") -> k.substringAfter(':').toInt().let { n -> select(if (n == 8) tabs.lastIndex else n.coerceAtMost(tabs.lastIndex)) }
+            }
+            true
+        }
+    }
 
     BackHandler(ui.fullScreen || showTabs || showMenu || editing || tab.findText != null || tab.canBack) {
         when {
@@ -216,6 +273,15 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().then(if (ui.fullScreen) Modifier else Modifier.statusBarsPadding())) {
+            if (wide && !ui.fullScreen) {
+                TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
+                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) },
+                    onNewTab = { newTab(tab.private) })
+                TabStrip(tabs, current, ui.privateLocked, select = { select(it) }, close = { closeTab(it) })
+                if (tab.findText != null) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.widthIn(max = 640.dp)) { FindBar(tab) }
+                }
+            }
             Box(Modifier.weight(1f)) {
                 AndroidView({ geckoView }, Modifier.fillMaxSize())
                 if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
@@ -223,8 +289,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             }
         }
 
-        // Barra inferior estilo Safari (oculta con vídeo a pantalla completa)
-        if (!ui.fullScreen) Column(
+        // Barra inferior estilo Safari (solo móvil; oculta con vídeo a pantalla completa)
+        if (!ui.fullScreen && !wide) Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .navigationBarsPadding().imePadding().padding(horizontal = 12.dp).padding(bottom = 8.dp)
         ) {
@@ -286,18 +352,15 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
 
         AnimatedVisibility(showTabs, enter = fadeIn() + scaleIn(initialScale = 1.1f), exit = fadeOut() + scaleOut(targetScale = 1.1f)) {
-            TabGrid(tabs, current, ui, select = { select(it); showTabs = false }, onClose = { i ->
-                tabs[i].close(); tabs.removeAt(i)
-                if (tabs.isEmpty()) tabs += Tab(ctx, false, null)
-                select(current.coerceAtMost(tabs.lastIndex))
-            }, onNew = { newTab(it) }, onDone = { showTabs = false })
+            TabGrid(tabs, current, ui, select = { select(it); showTabs = false }, onClose = { i -> closeTab(i) },
+                onNew = { newTab(it) }, onDone = { showTabs = false })
         }
     }
 }
 }
 
 @Composable
-fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu: () -> Unit, onSwipe: (Int) -> Unit) {
+fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu: () -> Unit, onSwipe: (Int) -> Unit, dropDown: Boolean = false) {
     // Al tocar la barra se empieza en blanco; la dirección actual queda como sugerencia «Editar» por si se quiere retocar.
     var text by remember(editing) { mutableStateOf("") }
     val focus = remember { FocusRequester() }
@@ -322,7 +385,8 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Settings.fetchSuggestions(text) }
             .filter { !it.equals(text.trim(), ignoreCase = true) }
     }
-    if (editing && !tab.private) {
+    var barWidth by remember { mutableIntStateOf(0) }
+    val suggestionsUi: @Composable () -> Unit = { if (editing && !tab.private) {
         val hist = History.get(ctx).suggest(text, max = if (remote.isEmpty()) 6 else 3)
         val current = tab.url.takeUnless { tab.isHome }
         if (hist.isNotEmpty() || remote.isNotEmpty() || (current != null && text.isEmpty())) Column(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp))) {
@@ -356,7 +420,10 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         }
     }
 
-    Box(contentAlignment = Alignment.BottomCenter) {
+    } }
+    if (!dropDown) suggestionsUi()
+
+    Box(Modifier.onSizeChanged { barWidth = it.width }, contentAlignment = Alignment.BottomCenter) {
     Row(
         Modifier.fillMaxWidth().height(50.dp).glass(RoundedCornerShape(25.dp), tint = if (tab.private) PrivateGlass else null)
             .pointerInput(tab) {
@@ -394,6 +461,14 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
     if (tab.progress < 100 && !editing) LinearProgressIndicator({ tab.progress / 100f },
         Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 3.dp).height(2.dp).clip(RoundedCornerShape(1.dp)),
         trackColor = androidx.compose.ui.graphics.Color.Transparent)
+    }
+    // Tablet: las sugerencias salen debajo de la barra, por encima de la página
+    if (dropDown && editing) {
+        val off = with(androidx.compose.ui.platform.LocalDensity.current) { 58.dp.roundToPx() }
+        androidx.compose.ui.window.Popup(offset = androidx.compose.ui.unit.IntOffset(0, off),
+            properties = androidx.compose.ui.window.PopupProperties(focusable = false)) {
+            Box(Modifier.width(with(androidx.compose.ui.platform.LocalDensity.current) { barWidth.toDp() })) { suggestionsUi() }
+        }
     }
 }
 
@@ -534,13 +609,16 @@ fun TabGrid(tabs: List<Tab>, current: Int, ui: UiState, select: (Int) -> Unit, o
 @Composable
 fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
     val ctx = LocalContext.current
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 160.dp)) {
+    val w = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val cols = if (w >= 600) (w / 110).coerceIn(5, 8) else 4
+    val side = ((w - 960) / 2).coerceAtLeast(0).dp
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(horizontal = side).padding(20.dp).padding(bottom = 160.dp)) {
         if (private) Text("Navegación privada: no se guarda historial ni cookies al cerrar.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp))
         Text("Favoritos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         val list = favs.list
         if (list.isEmpty()) Text("Toca el marcador de la barra para añadir webs aquí (Proxmox, Cloudreve, Immich…).", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        list.chunked(4).forEach { row ->
+        list.chunked(cols).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 row.forEach { (name, url) ->
                     Column(Modifier.weight(1f).combinedClickableCompat({ open(url) }, { favs.toggle(name, url) }), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -548,14 +626,14 @@ fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
                         Text(name, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
                     }
                 }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         if (!private) {
             val freq = History.get(ctx).frequent(exclude = favs.list.map { History.hostOf(it.second) }.toSet())
             if (freq.isNotEmpty()) {
                 Text("Visitados con frecuencia", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp, bottom = 12.dp))
-                freq.chunked(4).forEach { row ->
+                freq.chunked(cols).forEach { row ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                         row.forEach { e ->
                             Column(Modifier.weight(1f).clickable { open(e.url) }, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -564,7 +642,7 @@ fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
                                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
                             }
                         }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -667,6 +745,13 @@ fun SettingsSheet(dismiss: () -> Unit) {
                     Text("Lo que escribes se envía a DuckDuckGo para sugerir búsquedas", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(Settings.suggest, { Settings.setSuggest(ctx, it) })
+            }
+            if (Settings.isTablet) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Webs de escritorio en la tablet")
+                    Text("Como en el iPad. Se puede cambiar por web en «aA».", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(Settings.desktopTablet, { Settings.changeDesktopTablet(ctx, it) })
             }
             Text("Contraseñas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
             var showPw by remember { mutableStateOf(false) }
@@ -1001,6 +1086,66 @@ fun ReportSheet(dismiss: () -> Unit) {
             Text("Cuenta lo que bloquea la protección de Gecko; uBlock Origin bloquea además los anuncios por su cuenta.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
             TextButton({ Report.clear() }, Modifier.padding(top = 4.dp)) { Text("Borrar informe") }
+        }
+    }
+}
+
+/** Barra de tablet: navegación a la izquierda, dirección en el centro, acciones a la derecha. */
+@Composable
+fun TabletToolbar(tab: Tab, tabCount: Int, favs: Favorites, editing: Boolean, setEditing: (Boolean) -> Unit,
+                  onMenu: () -> Unit, onTabs: () -> Unit, onNewTab: () -> Unit) {
+    val ctx = LocalContext.current
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton({ tab.session.goBack() }, enabled = tab.canBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") }
+        IconButton({ tab.session.goForward() }, enabled = tab.canForward) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Adelante") }
+        Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
+                AddressBar(tab, editing, setEditing, onMenu = onMenu, onSwipe = {}, dropDown = true)
+            }
+        }
+        IconButton({
+            ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tab.url), null))
+        }, enabled = !tab.isHome) { Icon(Icons.Outlined.Share, "Compartir") }
+        IconButton({ if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url) }, enabled = !tab.isHome) {
+            Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
+        }
+        IconButton(onNewTab) { Icon(Icons.Filled.Add, "Nueva pestaña") }
+        IconButton(onTabs) {
+            Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/** Tira de pestañas de tablet (solo las del modo actual: normales o privadas). */
+@Composable
+fun TabStrip(tabs: List<Tab>, current: Int, privateLocked: Boolean, select: (Int) -> Unit, close: (Int) -> Unit) {
+    val priv = tabs.getOrNull(current)?.private == true
+    val list = tabs.withIndex().filter { it.value.private == priv }
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(current, list.size) {
+        val k = list.indexOfFirst { it.index == current }
+        if (k >= 0) state.animateScrollToItem(k)
+    }
+    androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth().height(40.dp), state = state,
+        contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        items(list.size, key = { System.identityHashCode(list[it].value) }) { k ->
+            val (i, t) = list[k]
+            val sel = i == current
+            val hidden = t.private && privateLocked
+            Row(Modifier.widthIn(min = 150.dp, max = 240.dp).height(34.dp).clip(RoundedCornerShape(10.dp))
+                .background(if (sel) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainer)
+                .clickable { select(i) }.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (hidden) Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp))
+                else if (t.isHome) Icon(Icons.Outlined.Home, null, Modifier.size(16.dp))
+                else SiteIcon(t.host, 16.dp, 4.dp)
+                Text(if (hidden) "Privada" else t.title.ifBlank { if (t.isHome) "Inicio" else t.host },
+                    Modifier.weight(1f).padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    fontSize = 13.sp, fontWeight = if (sel) FontWeight.Medium else FontWeight.Normal)
+                IconButton({ close(i) }, Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "Cerrar pestaña", Modifier.size(14.dp)) }
+            }
         }
     }
 }

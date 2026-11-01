@@ -21,8 +21,17 @@ object Settings {
         private set
     fun setSuggest(ctx: Context, v: Boolean) { suggest = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("sugerencias", v).apply() }
 
+    /** Pantalla de tablet (ancho mínimo ≥ 600 dp). Se fija al arrancar. */
+    var isTablet = false
+    /** En tablet, las webs se piden en versión de escritorio (como el iPad). */
+    var desktopTablet by mutableStateOf(true)
+        private set
+    fun changeDesktopTablet(ctx: Context, v: Boolean) { desktopTablet = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("escritorio_tablet", v).apply() }
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences("ajustes", 0)
+        isTablet = ctx.resources.configuration.smallestScreenWidthDp >= 600
+        desktopTablet = p.getBoolean("escritorio_tablet", true)
         search = p.getString("buscador", search)!!; suggest = p.getBoolean("sugerencias", true)
     }
 

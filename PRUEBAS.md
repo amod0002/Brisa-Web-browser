@@ -147,13 +147,28 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] En «aA» → Ajustes aparece la versión 0.9.2.
 - [ ] Repaso rápido: YouTube (vídeo y pantalla completa), Google Maps, un login del homelab, una descarga y el modo lectura.
 
-## 17. Android
+## 17. Novedades 0.9.3 · tablet (probar en la tablet)
+- [ ] Al abrir: barra arriba (atrás, adelante, dirección centrada, compartir, favorito, +, pestañas) y tira de pestañas debajo.
+- [ ] Tocar la barra: se escribe y las sugerencias salen debajo, por encima de la página.
+- [ ] Tira de pestañas: cambiar, cerrar con ×, se desplaza sola hasta la pestaña actual; «+» abre una nueva.
+- [ ] Pestañas privadas: la tira muestra solo las privadas; bloqueadas salen como «Privada» con candado.
+- [ ] Las webs salen en versión de escritorio (probar elpais.com, youtube.com, wikipedia.org). «aA» → versión móvil funciona en una web.
+- [ ] Ajustes → «Webs de escritorio en la tablet» apagado: las pestañas nuevas salen en versión móvil.
+- [ ] Inicio: más favoritos por fila y contenido centrado.
+- [ ] Girar la tablet: no se recarga la página y el diseño se adapta.
+- [ ] Pantalla dividida con otra app: si Brisa queda estrecha, pasa al diseño de móvil (barra abajo); al ensancharla vuelve el de tablet.
+- [ ] Vídeo a pantalla completa: desaparecen barra y tira; «atrás» sale.
+- [ ] Menús (aA, historial, descargas, ajustes) no ocupan toda la pantalla.
+- [ ] Con teclado: Ctrl+T, Ctrl+W, Ctrl+L, Ctrl+Tab / Ctrl+Mayús+Tab, Ctrl+1…9, Ctrl+F, Ctrl+R/F5, Ctrl+D, Ctrl+Mayús+N, Alt+← / Alt+→.
+- [ ] En el Pixel todo sigue igual que antes (barra abajo).
+
+## 18. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 18. Velocidad (comparar con Chrome)
+## 19. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
