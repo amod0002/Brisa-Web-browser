@@ -64,5 +64,8 @@ Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y l
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
 ## Hoja de ruta hasta la 1.0
-- **0.9** · Permisos por web en Ajustes y sincronización opcional de favoritos/historial con un servicio en el homelab (Proxmox).
+- **0.9** · Permisos por web en Ajustes y generador de contraseñas en los formularios de registro.
 - **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
+
+## Después de la 1.0 (aparcado)
+- **Sincronización** de favoritos, historial y pestañas con un servicio propio en el homelab (contenedor Docker en Proxmox/Portainer). Sin fecha: no se empieza hasta que se decida.
