@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "es.homelab.brisa"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "es.homelab.brisa"
         minSdk = 26
