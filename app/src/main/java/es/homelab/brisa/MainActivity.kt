@@ -69,6 +69,18 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         val types = mimes?.filter { it.contains('/') }?.toTypedArray()?.takeIf { it.isNotEmpty() } ?: arrayOf("*/*")
         if (multiple) pickMany.launch(types) else pickOne.launch(types)
     }
+    private var unlockCb: ((Boolean) -> Unit)? = null
+    private val unlockLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
+        unlockCb?.invoke(r.resultCode == RESULT_OK); unlockCb = null
+    }
+    override fun unlock(reason: String, cb: (Boolean) -> Unit) {
+        val km = getSystemService(android.app.KeyguardManager::class.java)
+        if (!km.isDeviceSecure) { cb(true); return }   // sin bloqueo de pantalla no hay nada que pedir
+        @Suppress("DEPRECATION")
+        val i = km.createConfirmDeviceCredentialIntent("Brisa", reason) ?: run { cb(true); return }
+        unlockCb?.invoke(false); unlockCb = cb; unlockLauncher.launch(i)
+    }
+
     private var permsCb: ((Boolean) -> Unit)? = null
     private val askPerms = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { r ->
         permsCb?.invoke(r.values.all { it }); permsCb = null
@@ -629,6 +641,16 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 }
                 Switch(Settings.suggest, { Settings.setSuggest(ctx, it) })
             }
+            Text("Contraseñas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            var showPw by remember { mutableStateOf(false) }
+            OutlinedButton({
+                (ctx as? PromptHost)?.unlock("Ver tus contraseñas guardadas") { ok -> if (ok) showPw = true } ?: run { showPw = true }
+            }, Modifier.fillMaxWidth()) { Text("Contraseñas guardadas (${Passwords.logins.size})") }
+            if (showPw) PasswordsSheet { showPw = false }
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Ofrecer guardar contraseñas", Modifier.weight(1f))
+                Switch(Passwords.offerSave, { Passwords.setOfferSave(it) })
+            }
             Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {
                 Text(if (cleared) "Datos borrados" else "Borrar historial, cookies y caché")
@@ -735,4 +757,77 @@ fun GroupDialog(tab: Tab, groups: List<String>, dismiss: () -> Unit, set: (Strin
         } },
         confirmButton = { TextButton({ if (name.isNotBlank()) { set(name.trim()); dismiss() } }, enabled = name.isNotBlank()) { Text("Crear") } },
         dismissButton = { if (tab.group != null) TextButton({ set(null); dismiss() }) { Text("Quitar del grupo") } else TextButton(dismiss) { Text("Cancelar") } })
+}
+
+/** Contraseñas guardadas: buscar, ver, copiar, editar, borrar y webs en «Nunca». */
+@Composable
+fun PasswordsSheet(dismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var q by remember { mutableStateOf("") }
+    var open by remember { mutableStateOf<Passwords.Login?>(null) }
+    fun copy(label: String, t: String) {
+        val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+        val clip = android.content.ClipData.newPlainText(label, t)
+        // Android 13+: marcar como sensible para que no se muestre en la vista previa del portapapeles
+        if (android.os.Build.VERSION.SDK_INT >= 33) clip.description.extras = android.os.PersistableBundle().apply {
+            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true) }
+        cm.setPrimaryClip(clip)
+        android.widget.Toast.makeText(ctx, "$label copiado", android.widget.Toast.LENGTH_SHORT).show()
+    }
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Text("Contraseñas", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), singleLine = true,
+                leadingIcon = { Icon(Icons.Outlined.Search, null) }, placeholder = { Text("Buscar web o usuario") })
+        }
+        val list = Passwords.logins.filter { q.isBlank() || it.host.contains(q, true) || it.username.contains(q, true) }.sortedBy { it.host }
+        if (list.isEmpty()) Text(if (Passwords.logins.isEmpty()) "Cuando inicies sesión en una web, Brisa te ofrecerá guardar la contraseña aquí, cifrada en el móvil." else "Sin resultados.",
+            Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(bottom = 16.dp)) {
+            items(list.size) { i ->
+                val l = list[i]
+                ListItem(leadingContent = { SiteIcon(l.host, 36.dp) },
+                    headlineContent = { Text(l.host, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(l.username.ifBlank { "(sin usuario)" }, maxLines = 1) },
+                    modifier = Modifier.clickable { open = l })
+            }
+            if (Passwords.never.isNotEmpty()) {
+                item { Text("Nunca guardar en", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp)) }
+                items(Passwords.never.size) { i ->
+                    val h = Passwords.never.sorted()[i]
+                    ListItem(leadingContent = { SiteIcon(h, 28.dp, 6.dp) }, headlineContent = { Text(h) },
+                        trailingContent = { IconButton({ Passwords.removeNever(h) }) { Icon(Icons.Filled.Close, "Quitar") } })
+                }
+            }
+        }
+    }
+    open?.let { l ->
+        var user by remember(l.guid) { mutableStateOf(l.username) }
+        var pass by remember(l.guid) { mutableStateOf(l.password) }
+        var visible by remember(l.guid) { mutableStateOf(false) }
+        var confirmDelete by remember(l.guid) { mutableStateOf(false) }
+        AlertDialog(onDismissRequest = { open = null },
+            icon = { SiteIcon(l.host, 40.dp) },
+            title = { Text(l.host) },
+            text = { Column {
+                OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Usuario") },
+                    trailingIcon = { IconButton({ copy("Usuario", user) }) { Icon(Icons.Outlined.ContentCopy, "Copiar usuario") } })
+                OutlinedTextField(pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true, label = { Text("Contraseña") },
+                    visualTransformation = if (visible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = { Row {
+                        IconButton({ visible = !visible }) { Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, "Mostrar") }
+                        IconButton({ copy("Contraseña", pass) }) { Icon(Icons.Outlined.ContentCopy, "Copiar contraseña") }
+                    } })
+                Text(l.origin, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                TextButton({ confirmDelete = true }, Modifier.padding(top = 4.dp)) {
+                    Text("Borrar", color = MaterialTheme.colorScheme.error)
+                }
+                if (confirmDelete) Text("Toca «Borrar» otra vez para confirmar.", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+            } },
+            confirmButton = { TextButton({
+                if (user != l.username || pass != l.password) Passwords.update(l.guid, user, pass); open = null
+            }) { Text("Hecho") } },
+            dismissButton = { if (confirmDelete) TextButton({ Passwords.delete(l.guid); open = null }) {
+                Text("Borrar", color = MaterialTheme.colorScheme.error) } })
+    }
 }

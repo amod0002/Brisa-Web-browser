@@ -103,13 +103,25 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Al reabrir la app con muchas pestañas: solo carga la visible; las demás cargan al entrar en ellas (con su «atrás» intacto).
 - [ ] El icono de modo lectura sigue apareciendo en los artículos (puede tardar un segundo más).
 
-## 13. Android
+## 13. Novedades 0.8 · contraseñas
+- [ ] Iniciar sesión en una web (p. ej. Cloudreve, Immich o Portainer del homelab): sale «¿Guardar la contraseña de …?» con el usuario.
+- [ ] «Guardar» → cerrar sesión → volver: el usuario y la contraseña se rellenan solos.
+- [ ] Cambiar la contraseña en la web: sale «¿Actualizar…?».
+- [ ] «Nunca» en una web: no vuelve a preguntar; aparece en Ajustes → Contraseñas → «Nunca guardar en», y se puede quitar.
+- [ ] Dos cuentas en la misma web: al rellenar sale «Elegir cuenta».
+- [ ] Ajustes → Contraseñas guardadas: pide huella/PIN; si se cancela, no se abre.
+- [ ] Buscar, ver (ojo), copiar usuario y contraseña, editar y borrar (pide confirmar).
+- [ ] Ajustes → «Ofrecer guardar contraseñas» apagado: no pregunta (lo guardado se sigue rellenando).
+- [ ] Pestañas privadas: no ofrece guardar.
+- [ ] Bitwarden u otro gestor (autorrelleno de Android) sigue funcionando en los formularios.
+
+## 14. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 14. Velocidad (comparar con Chrome)
+## 15. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

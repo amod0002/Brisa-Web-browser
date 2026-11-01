@@ -33,3 +33,11 @@ class FrequentTest {
         assertEquals(1, freq.size); assertEquals(5, freq[0].visits)
     }
 }
+
+class PasswordGenTest {
+    @Test fun largoYVariado() {
+        val p = Passwords.generate(18)
+        assertEquals(18, p.length)
+        org.junit.Assert.assertNotEquals(p, Passwords.generate(18))
+    }
+}

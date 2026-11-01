@@ -27,6 +27,8 @@ typealias Dialog = @Composable (close: () -> Unit) -> Unit
 
 /** Lo que las ventanas de las webs y los permisos necesitan de la actividad. */
 interface PromptHost {
+    /** Pide PIN/huella del móvil antes de enseñar contraseñas. */
+    fun unlock(reason: String, cb: (Boolean) -> Unit)
     fun show(d: Dialog)
     fun pickFiles(mimes: Array<String>?, multiple: Boolean, cb: (List<Uri>?) -> Unit)
     fun androidPermissions(perms: Array<String>, cb: (Boolean) -> Unit)
@@ -119,6 +121,42 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : P
                 } },
                 confirmButton = { if (multiple) TextButton({ done(pr.confirm(chosen.toTypedArray())); close() }) { Text("Aceptar") } },
                 dismissButton = { TextButton({ close() }) { Text("Cancelar") } })
+        }
+    }
+
+    // ---- Contraseñas ----------------------------------------------------------------------------
+    override fun onLoginSave(s: GeckoSession, req: AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>): GeckoResult<PromptResponse> {
+        val opt = req.options.firstOrNull() ?: return GeckoResult.fromValue(req.dismiss())
+        val e = opt.value
+        val host = History.hostOf(e.origin)
+        if (!Passwords.offerSave || host in Passwords.never || Passwords.isKnown(e)) return GeckoResult.fromValue(req.dismiss())
+        val updating = Passwords.logins.any { it.origin == e.origin && it.username == (e.username ?: "") }
+        return ask(req) { r, done ->
+            { close -> AlertDialog(onDismissRequest = { close() },
+                icon = { SiteIcon(host, 40.dp) },
+                title = { Text(if (updating) "¿Actualizar la contraseña de $host?" else "¿Guardar la contraseña de $host?") },
+                text = { Text(listOfNotNull(e.username?.takeIf { it.isNotBlank() }, "•".repeat(e.password.length.coerceAtMost(12))).joinToString("\n")) },
+                confirmButton = { TextButton({ done(r.confirm(opt)); close() }) { Text(if (updating) "Actualizar" else "Guardar") } },
+                dismissButton = { Row {
+                    if (!updating) TextButton({ Passwords.addNever(host); close() }) { Text("Nunca") }
+                    TextButton({ close() }) { Text("Ahora no") }
+                } }) }
+        }
+    }
+
+    override fun onLoginSelect(s: GeckoSession, req: AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>): GeckoResult<PromptResponse> {
+        if (req.options.isEmpty()) return GeckoResult.fromValue(req.dismiss())
+        if (req.options.size == 1) return GeckoResult.fromValue(req.confirm(req.options[0]))
+        return ask(req) { r, done ->
+            { close -> AlertDialog(onDismissRequest = { close() },
+                title = { Text("Elegir cuenta") },
+                text = { Column { r.options.forEach { o ->
+                    Row(Modifier.fillMaxWidth().clickable { done(r.confirm(o)); close() }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SiteIcon(History.hostOf(o.value.origin), 28.dp, 6.dp)
+                        Text(o.value.username?.ifBlank { null } ?: "(sin usuario)", Modifier.padding(start = 12.dp))
+                    }
+                } } },
+                confirmButton = { TextButton({ close() }) { Text("Cancelar") } }) }
         }
     }
 

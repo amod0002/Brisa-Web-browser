@@ -34,11 +34,14 @@ object Engine {
                     .build()
             )
             .aboutConfigEnabled(true)
+            .loginAutofillEnabled(true)
             .automaticFontSizeAdjustment(false)
             .fontSizeFactor(ctx.getSharedPreferences("ajustes", 0).getFloat("texto", 1f))
             .build()
     ).also { rt ->
         runtime = rt
+        Passwords.init(ctx)
+        rt.autocompleteStorageDelegate = Passwords
         Settings.load(ctx)
         // Extensión propia (assets/extensions/brisa): iconos y modo lectura.
         rt.webExtensionController.ensureBuiltIn("resource://android/assets/extensions/brisa/", "brisa@homelab.es")

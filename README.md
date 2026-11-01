@@ -53,11 +53,16 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Restauración diferida**: al reabrir la app solo carga la pestaña visible.
 - La comprobación de modo lectura espera a que el móvil esté libre.
 
+## 0.8.0 · contraseñas
+- **Guardar y rellenar contraseñas** de Gecko (formularios y usuario/contraseña HTTP), con «Guardar / Nunca / Ahora no» y «Actualizar».
+- **Cifradas** con una clave AES-256 del almacén de claves de Android (no sale del chip de seguridad); archivo `contrasenas.bin` dentro de la app, sin nube.
+- **Ajustes → Contraseñas**: protegido con huella/PIN; buscar, ver, copiar (marcado como sensible), editar, borrar y lista «Nunca guardar en».
+- Compatible con gestores externos (Bitwarden…) mediante el autorrelleno de Android.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
 ## Hoja de ruta hasta la 1.0
-- **0.8** · Guardar y rellenar contraseñas (cifradas con el almacén de claves de Android; compatible con Bitwarden/autorrelleno).
 - **0.9** · Permisos por web en Ajustes y sincronización opcional de favoritos/historial con un servicio en el homelab (Proxmox).
 - **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
