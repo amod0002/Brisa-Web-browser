@@ -130,13 +130,24 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Borrar datos al salir (activado): cerrar Brisa desde Recientes y volver → sin pestañas, sin historial y con las sesiones cerradas.
 - [ ] Permisos por web: dar ubicación a maps.google.com → aparece en la lista; «Quitar» → vuelve a preguntar.
 
-## 15. Android
+## 15. Novedades 0.9.1
+- [ ] Registro en una web (formulario con «nueva contraseña» o dos campos de contraseña): al tocar el campo sale «Usar contraseña segura»; rellena los dos y se ve un momento.
+- [ ] En formularios de inicio de sesión NO aparece.
+- [ ] Al enviar el registro, Brisa ofrece guardar la contraseña generada.
+- [ ] «aA» → tocar la fila del escudo: Informe de privacidad con total, barras por día y webs con más rastreadores.
+- [ ] «Borrar informe» lo deja a cero. Las pestañas privadas no suman.
+- [ ] Escudo por web: el interruptor en «aA» desactiva la protección solo en esa web (recarga; pone «Protección desactivada en …»). Otra web sigue protegida. Volver a activarlo.
+- [ ] Pestañas privadas con bloqueo: abrir una privada, salir a la pantalla de inicio de Android y volver → «Pestañas privadas bloqueadas»; «Desbloquear» pide huella/PIN.
+- [ ] La vista «Privada» de la cuadrícula también queda bloqueada; las normales no.
+- [ ] Ajustes → «Bloquear pestañas privadas» apagado: no se bloquean.
+
+## 16. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 16. Velocidad (comparar con Chrome)
+## 17. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

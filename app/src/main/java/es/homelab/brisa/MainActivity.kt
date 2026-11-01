@@ -144,6 +144,13 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         super.onDestroy()
     }
 
+    override fun onStop() {
+        super.onStop()
+        Report.save()
+        // Al salir de la app, las pestañas privadas quedan bloqueadas hasta la huella/PIN
+        if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+    }
+
     override fun onResume() {
         super.onResume()
         tabs.getOrNull(current)?.session?.setActive(true)
@@ -164,6 +171,10 @@ class UiState {
     var context by mutableStateOf<Pair<Tab, org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement>?>(null)
     var fullScreen by mutableStateOf(false)
     val dialogs = mutableStateListOf<Dialog>()
+    var privateLocked by mutableStateOf(false)
+    fun unlockPrivate(ctx: android.content.Context) {
+        (ctx as? PromptHost)?.unlock("Ver tus pestañas privadas") { ok -> if (ok) privateLocked = false } ?: run { privateLocked = false }
+    }
 }
 
 @Composable
@@ -208,6 +219,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             Box(Modifier.weight(1f)) {
                 AndroidView({ geckoView }, Modifier.fillMaxSize())
                 if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
+                if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
             }
         }
 
@@ -274,7 +286,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
 
         AnimatedVisibility(showTabs, enter = fadeIn() + scaleIn(initialScale = 1.1f), exit = fadeOut() + scaleOut(targetScale = 1.1f)) {
-            TabGrid(tabs, current, select = { select(it); showTabs = false }, onClose = { i ->
+            TabGrid(tabs, current, ui, select = { select(it); showTabs = false }, onClose = { i ->
                 tabs[i].close(); tabs.removeAt(i)
                 if (tabs.isEmpty()) tabs += Tab(ctx, false, null)
                 select(current.coerceAtMost(tabs.lastIndex))
@@ -412,9 +424,13 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
     LaunchedEffect(Unit) { Engine.hasUblock(ctx) { ublock = it } }
     ModalBottomSheet(onDismissRequest = dismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
-            ListItem(leadingContent = { Icon(Icons.Outlined.Shield, null) },
-                headlineContent = { Text("${tab.blocked} rastreadores bloqueados") },
-                supportingContent = { Text("Protección estricta de Firefox") })
+            var showReport by remember { mutableStateOf(false) }
+            ListItem(leadingContent = { Icon(if (tab.shieldOff) Icons.Outlined.RemoveModerator else Icons.Outlined.Shield, null) },
+                headlineContent = { Text(if (tab.shieldOff) "Protección desactivada en ${tab.host}" else "${tab.blocked} rastreadores bloqueados") },
+                supportingContent = { Text("Ver informe de privacidad") },
+                trailingContent = { if (!tab.isHome && !tab.private && tab.trackingPerm != null) Switch(!tab.shieldOff, { tab.toggleShield(); dismiss() }) },
+                modifier = Modifier.clickable { showReport = true })
+            if (showReport) ReportSheet { showReport = false }
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Tamaño del texto", Modifier.weight(1f))
                 OutlinedButton({ size = (size - 0.1f).coerceAtLeast(0.8f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 13.sp) }
@@ -464,7 +480,7 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
 }
 
 @Composable
-fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int) -> Unit, onNew: (Boolean) -> Unit, onDone: () -> Unit) {
+fun TabGrid(tabs: List<Tab>, current: Int, ui: UiState, select: (Int) -> Unit, onClose: (Int) -> Unit, onNew: (Boolean) -> Unit, onDone: () -> Unit) {
     var privateView by remember { mutableStateOf(tabs.getOrNull(current)?.private == true) }
     // Grupo que se está viendo: null = todas
     var groupView by remember { mutableStateOf(tabs.getOrNull(current)?.group) }
@@ -479,7 +495,9 @@ fun TabGrid(tabs: List<Tab>, current: Int, select: (Int) -> Unit, onClose: (Int)
             groups.forEach { g -> FilterChip(groupView == g, { groupView = g }, { Text("$g · ${tabs.count { it.group == g }}") }) }
         }
         grouping?.let { t -> GroupDialog(t, groups, { grouping = null }) { g -> t.group = g; if (g != null) groupView = g } }
-        LazyVerticalGrid(GridCells.Adaptive(160.dp), Modifier.weight(1f), contentPadding = PaddingValues(12.dp),
+        val ctx = LocalContext.current
+        if (privateView && ui.privateLocked && shown.isNotEmpty()) Box(Modifier.weight(1f).fillMaxWidth()) { PrivateLock { ui.unlockPrivate(ctx) } }
+        else LazyVerticalGrid(GridCells.Adaptive(160.dp), Modifier.weight(1f), contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(shown.size) { k ->
                 val (i, t) = shown[k]
@@ -884,6 +902,7 @@ fun PrivacySection() {
     toggle("Rechazar avisos de cookies", "Pulsa «Rechazar» por ti en los avisos más comunes", Privacy.cookieBanners, "cookies")
     toggle("Pedir que no vendan tus datos", "Envía la señal Global Privacy Control a cada web", Privacy.gpc, "gpc")
     toggle("Proteger IP en videollamadas", "WebRTC no revela tu IP real (útil con VPN)", Privacy.webrtc, "webrtc")
+    toggle("Bloquear pestañas privadas", "Al volver a Brisa, piden huella o PIN para verlas", Privacy.lockPrivate, "bloquear_privadas")
     toggle("Borrar datos al salir", "Al cerrar Brisa se borran historial, cookies, caché y pestañas abiertas (cerrarás sesión en las webs)", Privacy.clearOnExit, "borrar_salir")
 
     OutlinedButton({ showPerms = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Permisos por web") }
@@ -933,4 +952,55 @@ private fun label(p: Int): String? = when (p) {
     org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_STORAGE_ACCESS -> "Cookies entre webs"
     org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_TRACKING -> "Protección desactivada"
     else -> null
+}
+
+/** Tapa una pestaña privada bloqueada. */
+@Composable
+fun PrivateLock(unlock: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).clickable(onClick = unlock),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Outlined.Lock, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Pestañas privadas bloqueadas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+        FilledTonalButton(unlock, Modifier.padding(top = 16.dp)) { Text("Desbloquear") }
+    }
+}
+
+/** Informe de privacidad de los últimos 7 días. */
+@Composable
+fun ReportSheet(dismiss: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val v = Report.version   // repintar con datos nuevos
+    val days = Report.perDay(7)
+    val max = (days.maxOfOrNull { it.second } ?: 0).coerceAtLeast(1)
+    val names = listOf("L", "M", "X", "J", "V", "S", "D")
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+            Text("Informe de privacidad", style = MaterialTheme.typography.titleLarge)
+            Text("Últimos 7 días · solo en este móvil", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${Report.total(7)}", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text("rastreadores bloqueados por Brisa", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().height(120.dp).padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                days.forEach { (d, n) ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.fillMaxWidth().fillMaxHeight(0.82f * n / max + 0.02f).clip(RoundedCornerShape(6.dp))
+                            .background(if (d == java.time.LocalDate.now()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer))
+                        Text(names[d.dayOfWeek.value - 1], fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+            val top = Report.topSites(7)
+            if (top.isNotEmpty()) {
+                Text("Webs con más rastreadores", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp))
+                top.forEach { (h, n) ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SiteIcon(h, 28.dp, 6.dp)
+                        Text(h, Modifier.weight(1f).padding(start = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("$n", fontWeight = FontWeight.Medium)
+                    }
+                }
+            } else Text("Aún no hay datos. Navega un poco y vuelve.", Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Cuenta lo que bloquea la protección de Gecko; uBlock Origin bloquea además los anuncios por su cuenta.",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+            TextButton({ Report.clear() }, Modifier.padding(top = 4.dp)) { Text("Borrar informe") }
+        }
+    }
 }

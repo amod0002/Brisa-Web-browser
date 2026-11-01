@@ -42,6 +42,7 @@ object Engine {
     ).also { rt ->
         runtime = rt
         Passwords.init(ctx)
+        Report.load(ctx)
         rt.autocompleteStorageDelegate = Passwords
         Settings.load(ctx)
         // Extensión propia (assets/extensions/brisa): iconos y modo lectura.
@@ -138,6 +139,16 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var desktop by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
     var readerable by mutableStateOf(false)
+    /** Permiso de rastreo de la web actual. ALLOW = protección desactivada en esta web. */
+    var trackingPerm by mutableStateOf<GeckoSession.PermissionDelegate.ContentPermission?>(null)
+    val shieldOff get() = trackingPerm?.value == GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+    fun toggleShield() {
+        val p = trackingPerm ?: return
+        val v = if (shieldOff) GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY
+                else GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+        Engine.get(ctx).storageController.setPermission(p, v)
+        session.reload()
+    }
     var reading by mutableStateOf(false)
     private var port: WebExtension.Port? = null
     /** Desplazamiento acumulado: la barra se encoge al bajar y vuelve al subir. */
@@ -170,6 +181,10 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
+            // Gecko nos da el permiso de «rastreo» de cada web: sirve para el escudo por web.
+            override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
+                trackingPerm = perms.firstOrNull { it.permission == GeckoSession.PermissionDelegate.PERMISSION_TRACKING }
+            }
             // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
             override fun onLoadError(s: GeckoSession, uri: String?, e: org.mozilla.geckoview.WebRequestError): GeckoResult<String>? {
                 if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return null
@@ -195,7 +210,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             }
         }
         contentBlockingDelegate = object : ContentBlocking.Delegate {
-            override fun onContentBlocked(s: GeckoSession, e: ContentBlocking.BlockEvent) { blocked++ }
+            override fun onContentBlocked(s: GeckoSession, e: ContentBlocking.BlockEvent) { blocked++; if (!private) Report.add(host) }
         }
         scrollDelegate = object : GeckoSession.ScrollDelegate {
             var last = 0

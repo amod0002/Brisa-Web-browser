@@ -46,3 +46,53 @@
     port.postMessage({ type: "reader", ok: true });
   });
 })();
+
+// Generador de contraseñas: en formularios de registro (campo «nueva contraseña» o dos campos de
+// contraseña), al tocar el campo aparece «Usar contraseña segura» y rellena ambos.
+(function () {
+  if (window.top !== window) return;
+  const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_.!?";
+  function generate(n = 18) {
+    const r = new Uint32Array(n); crypto.getRandomValues(r);
+    let p = ""; for (const x of r) p += CHARS[x % CHARS.length];
+    // Asegurar mayúscula, minúscula, número y símbolo
+    return /[A-Z]/.test(p) && /[a-z]/.test(p) && /\d/.test(p) && /[-_.!?]/.test(p) ? p : generate(n);
+  }
+  function isSignup(input) {
+    if (input.autocomplete === "new-password") return true;
+    const form = input.form || document;
+    return form.querySelectorAll("input[type='password']").length >= 2 &&
+      !/login|signin|iniciar|acceder/i.test((form.id || "") + " " + (form.action || ""));
+  }
+  function setValue(el, v) {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(el, v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  let chip = null;
+  function hide() { if (chip) { chip.remove(); chip = null; } }
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== "password" || el.value || !isSignup(el)) return;
+    hide();
+    const pass = generate();
+    chip = document.createElement("div");
+    chip.textContent = "Usar contraseña segura";
+    const r = el.getBoundingClientRect();
+    Object.assign(chip.style, {
+      position: "absolute", left: (r.left + scrollX) + "px", top: (r.bottom + scrollY + 6) + "px", zIndex: 2147483647,
+      background: "#1c1c1e", color: "#fff", font: "500 14px system-ui,sans-serif", padding: "10px 14px",
+      borderRadius: "12px", boxShadow: "0 6px 20px rgba(0,0,0,.25)"
+    });
+    chip.addEventListener("pointerdown", ev => {
+      ev.preventDefault();
+      const fields = [...(el.form || document).querySelectorAll("input[type='password']")].filter(f => !f.value || f === el);
+      fields.forEach(f => setValue(f, pass));
+      el.type = "text"; setTimeout(() => { el.type = "password"; }, 2500);   // se ve un momento para comprobarla
+      hide();
+    });
+    document.body.appendChild(chip);
+  });
+  document.addEventListener("focusout", () => setTimeout(hide, 200));
+})();

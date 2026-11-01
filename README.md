@@ -69,12 +69,17 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Borrar datos al salir** (opcional, desactivado por defecto).
 - **Permisos por web** en Ajustes, con «Quitar».
 
+## 0.9.1
+- **Generador de contraseñas** en formularios de registro («Usar contraseña segura», 18 caracteres, `crypto.getRandomValues`).
+- **Informe de privacidad**: rastreadores bloqueados por día y webs con más rastreo (7 días; datos solo en el móvil).
+- **Escudo por web**: desactivar la protección de Gecko solo en una web que falle.
+- **Pestañas privadas bloqueadas** con huella/PIN al volver a la app (opcional, activado por defecto).
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
 ## Hoja de ruta hasta la 1.0
-- **0.9.x** · Generador de contraseñas en los formularios de registro; informe de privacidad; pestañas privadas con huella; escudo por web.
 - **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
 
 ## Después de la 1.0 (aparcado)
