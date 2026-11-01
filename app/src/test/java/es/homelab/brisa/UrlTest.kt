@@ -41,3 +41,15 @@ class PasswordGenTest {
         org.junit.Assert.assertNotEquals(p, Passwords.generate(18))
     }
 }
+
+class PrivacyTest {
+    @Test fun redLocal() {
+        org.junit.Assert.assertTrue(Privacy.isLocal("192.168.1.50:8006"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("10.0.0.2"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("nube.local"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("172.20.1.1"))
+        org.junit.Assert.assertFalse(Privacy.isLocal("172.40.1.1"))
+        org.junit.Assert.assertFalse(Privacy.isLocal("elpais.com"))
+    }
+    @Test fun listaDeRastreo() = org.junit.Assert.assertTrue("fbclid" in Privacy.STRIP && "utm_source" in Privacy.STRIP)
+}

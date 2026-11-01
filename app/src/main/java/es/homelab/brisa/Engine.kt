@@ -45,7 +45,9 @@ object Engine {
         Settings.load(ctx)
         // Extensión propia (assets/extensions/brisa): iconos y modo lectura.
         rt.webExtensionController.ensureBuiltIn("resource://android/assets/extensions/brisa/", "brisa@homelab.es")
-            .accept({ ext -> if (ext != null) { builtIn = ext; waiting.forEach { it(ext) }; waiting.clear() } }, { })
+            .accept({ ext -> if (ext != null) { builtIn = ext; Privacy.attach(ext); waiting.forEach { it(ext) }; waiting.clear() } }, { })
+        Privacy.load(ctx)
+        Privacy.apply(ctx)
         // Las extensiones las instala el usuario desde el menú «aA»: se aceptan sin más diálogos.
         rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
@@ -146,7 +148,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
-            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100 }
+            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
@@ -167,6 +169,22 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
+            // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
+            override fun onLoadError(s: GeckoSession, uri: String?, e: org.mozilla.geckoview.WebRequestError): GeckoResult<String>? {
+                if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return null
+                val host = History.hostOf(uri)
+                (tabHost as? PromptHost)?.show { close ->
+                    androidx.compose.material3.AlertDialog(onDismissRequest = { close() },
+                        icon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.LockOpen, null) },
+                        title = { androidx.compose.material3.Text("$host no tiene conexión segura") },
+                        text = { androidx.compose.material3.Text("Lo que envíes o veas en esta web podría leerlo alguien de tu red. Brisa la ha bloqueado porque tienes activado «Solo HTTPS».") },
+                        confirmButton = { androidx.compose.material3.TextButton({ close(); if (canBack) s.goBack() }) { androidx.compose.material3.Text("Volver") } },
+                        dismissButton = { androidx.compose.material3.TextButton({
+                            close(); Privacy.allowInsecureOnce(ctx); s.loadUri(uri.replaceFirst("https://", "http://"))
+                        }) { androidx.compose.material3.Text("Continuar sin seguridad") } })
+                }
+                return null
+            }
             override fun onCanGoForward(s: GeckoSession, v: Boolean) { canForward = v }
             // Enlaces target=_blank y window.open: pestaña nueva junto a esta.
             override fun onNewSession(s: GeckoSession, uri: String): GeckoResult<GeckoSession> {

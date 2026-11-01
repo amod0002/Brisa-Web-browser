@@ -1,12 +1,21 @@
 {
   "manifest_version": 2,
   "name": "Brisa",
-  "version": "1.0",
+  "version": "1.1",
   "browser_specific_settings": { "gecko": { "id": "brisa@homelab.es" } },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["Readability-readerable.js", "Readability.js", "brisa.js"],
-    "run_at": "document_idle"
-  }],
-  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons", "<all_urls>"]
+  "background": { "scripts": ["background.js"] },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["Readability-readerable.js", "Readability.js", "brisa.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["cookies.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons", "storage", "privacy", "<all_urls>"]
 }

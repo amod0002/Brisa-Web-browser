@@ -98,6 +98,10 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         Engine.get(this) // arranca el motor cuanto antes
         Tab.tabHost = this
         Downloads.load(this)
+        Engine.get(this)
+        // «Borrar datos al salir»: si quedó pendiente (la app se cerró sin pasar por onDestroy), se borra ahora
+        val wipe = Privacy.clearOnExit
+        if (wipe) { Privacy.clearAll(this); tabsFile.delete() }
         // Pestañas de la última vez, con su historial atrás/adelante
         runCatching {
             val a = org.json.JSONArray(tabsFile.readText())
@@ -135,6 +139,11 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         intent.dataString?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
     }
 
+    override fun onDestroy() {
+        if (isFinishing && Privacy.clearOnExit) { Privacy.clearAll(this); tabsFile.delete() }
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
         tabs.getOrNull(current)?.session?.setActive(true)
@@ -147,7 +156,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         tabs.filter { !it.private && !it.isHome }.forEach {
             a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: ""))
         }
-        runCatching { tabsFile.writeText(a.toString()) }
+        if (!Privacy.clearOnExit) runCatching { tabsFile.writeText(a.toString()) }
     }
 }
 
@@ -651,6 +660,7 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 Text("Ofrecer guardar contraseñas", Modifier.weight(1f))
                 Switch(Passwords.offerSave, { Passwords.changeOfferSave(it) })
             }
+            PrivacySection()
             Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {
                 Text(if (cleared) "Datos borrados" else "Borrar historial, cookies y caché")
@@ -830,4 +840,97 @@ fun PasswordsSheet(dismiss: () -> Unit) {
             dismissButton = { if (confirmDelete) TextButton({ Passwords.delete(l.guid); open = null }) {
                 Text("Borrar", color = MaterialTheme.colorScheme.error) } })
     }
+}
+
+/** Ajustes → Seguridad y privacidad. */
+@Composable
+fun PrivacySection() {
+    val ctx = LocalContext.current
+    var showPerms by remember { mutableStateOf(false) }
+    @Composable fun toggle(title: String, sub: String, v: Boolean, key: String) =
+        Row(Modifier.fillMaxWidth().clickable { Privacy.set(ctx, key, !v) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(title)
+                Text(sub, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(v, { Privacy.set(ctx, key, it) })
+        }
+    @Composable fun choice(options: List<String>, selected: Int, key: String) =
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            options.forEachIndexed { i, o ->
+                SegmentedButton(selected == i, { Privacy.set(ctx, key, i) }, SegmentedButtonDefaults.itemShape(i, options.size)) { Text(o, fontSize = 13.sp) }
+            }
+        }
+
+    Text("Seguridad y privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+
+    Text("Solo HTTPS")
+    Text("Bloquea las webs sin conexión segura y te deja continuar si quieres. Las direcciones de tu red local (192.168.x.x, .local…) no se ven afectadas.",
+        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    choice(listOf("No", "En privadas", "Siempre"), Privacy.httpsOnly, "https")
+
+    Text("DNS cifrado", Modifier.padding(top = 8.dp))
+    Text("Tu operadora no ve qué webs visitas. «Automático» usa el DNS normal si el cifrado falla; «Estricto» nunca.",
+        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    choice(listOf("No", "Automático", "Estricto"), Privacy.dohMode, "doh")
+    if (Privacy.dohMode > 0) Privacy.DOH.forEach { (name, uri) ->
+        Row(Modifier.fillMaxWidth().clickable { Privacy.set(ctx, "doh_uri", uri) }, verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(Privacy.dohUri == uri, { Privacy.set(ctx, "doh_uri", uri) }); Text(name)
+        }
+    }
+
+    toggle("Protección contra huella digital", "Las webs no pueden identificarte por las características del móvil", Privacy.fingerprint, "huella")
+    toggle("Limpiar enlaces de rastreo", "Quita utm_, fbclid, gclid y similares de las direcciones", Privacy.stripLinks, "enlaces")
+    toggle("Rechazar avisos de cookies", "Pulsa «Rechazar» por ti en los avisos más comunes", Privacy.cookieBanners, "cookies")
+    toggle("Pedir que no vendan tus datos", "Envía la señal Global Privacy Control a cada web", Privacy.gpc, "gpc")
+    toggle("Proteger IP en videollamadas", "WebRTC no revela tu IP real (útil con VPN)", Privacy.webrtc, "webrtc")
+    toggle("Borrar datos al salir", "Al cerrar Brisa se borran historial, cookies, caché y pestañas abiertas (cerrarás sesión en las webs)", Privacy.clearOnExit, "borrar_salir")
+
+    OutlinedButton({ showPerms = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Permisos por web") }
+    if (showPerms) SitePermissionsSheet { showPerms = false }
+}
+
+/** Permisos que has dado a cada web (ubicación, notificaciones…), con opción de quitarlos. */
+@Composable
+fun SitePermissionsSheet(dismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val sc = remember { Engine.get(ctx).storageController }
+    var perms by remember { mutableStateOf<List<org.mozilla.geckoview.GeckoSession.PermissionDelegate.ContentPermission>?>(null) }
+    fun reload() = sc.allPermissions.accept({ l -> perms = l.orEmpty().filter { label(it.permission) != null && !it.privateMode } }, { perms = emptyList() })
+    LaunchedEffect(Unit) { reload() }
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Text("Permisos por web", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 20.dp))
+        Text("La cámara y el micrófono se piden cada vez y no aparecen aquí.", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        val list = perms
+        if (list == null) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        else if (list.isEmpty()) Text("Ninguna web tiene permisos especiales.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(bottom = 16.dp)) {
+            val byHost = list.groupBy { History.hostOf(it.uri) }.toSortedMap()
+            byHost.forEach { (host, ps) ->
+                item(host) {
+                    ListItem(leadingContent = { SiteIcon(host, 32.dp) }, headlineContent = { Text(host, fontWeight = FontWeight.Medium) })
+                }
+                items(ps.size, key = { "$host-${ps[it].permission}" }) { i ->
+                    val p = ps[i]
+                    val allowed = p.value == org.mozilla.geckoview.GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+                    ListItem(modifier = Modifier.padding(start = 40.dp),
+                        headlineContent = { Text(label(p.permission)!!) },
+                        supportingContent = { Text(if (allowed) "Permitido" else "Bloqueado") },
+                        trailingContent = { TextButton({
+                            sc.setPermission(p, org.mozilla.geckoview.GeckoSession.PermissionDelegate.ContentPermission.VALUE_PROMPT); reload()
+                        }) { Text("Quitar") } })
+                }
+            }
+        }
+    }
+}
+
+private fun label(p: Int): String? = when (p) {
+    org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_GEOLOCATION -> "Ubicación"
+    org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION -> "Notificaciones"
+    org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> "Guardar datos"
+    org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_STORAGE_ACCESS -> "Cookies entre webs"
+    org.mozilla.geckoview.GeckoSession.PermissionDelegate.PERMISSION_TRACKING -> "Protección desactivada"
+    else -> null
 }

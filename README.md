@@ -59,12 +59,22 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - **Ajustes → Contraseñas**: protegido con huella/PIN; buscar, ver, copiar (marcado como sensible), editar, borrar y lista «Nunca guardar en».
 - Compatible con gestores externos (Bitwarden…) mediante el autorrelleno de Android.
 
+## 0.9.0 · seguridad y privacidad
+- **Solo HTTPS** (no / en privadas / siempre) con aviso y «Continuar sin seguridad» puntual; la red local queda fuera.
+- **DNS cifrado** (DoH): automático o estricto; Quad9, Mullvad, Mullvad sin anuncios o Cloudflare. `.local`, `.lan`, `.home.arpa`… nunca pasan por él.
+- **Protección contra huella digital** (también siempre en privadas).
+- **Limpiar enlaces de rastreo**: `utm_*`, `fbclid`, `gclid`, `msclkid`, `igshid` y otros ~40.
+- **Rechazar avisos de cookies** de los gestores más comunes (extensión interna; OneTrust, Didomi, Cookiebot, Sourcepoint, Quantcast, Usercentrics…).
+- **Global Privacy Control** y **protección de IP en WebRTC**.
+- **Borrar datos al salir** (opcional, desactivado por defecto).
+- **Permisos por web** en Ajustes, con «Quitar».
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
 ## Hoja de ruta hasta la 1.0
-- **0.9** · Permisos por web en Ajustes y generador de contraseñas en los formularios de registro.
+- **0.9.x** · Generador de contraseñas en los formularios de registro; informe de privacidad; pestañas privadas con huella; escudo por web.
 - **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
 
 ## Después de la 1.0 (aparcado)

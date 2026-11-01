@@ -115,13 +115,28 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Pestañas privadas: no ofrece guardar.
 - [ ] Bitwarden u otro gestor (autorrelleno de Android) sigue funcionando en los formularios.
 
-## 14. Android
+## 14. Novedades 0.9 · seguridad y privacidad
+- [ ] Solo HTTPS «Siempre»: abrir `http://neverssl.com` → aviso «no tiene conexión segura»; «Volver» y «Continuar sin seguridad» funcionan.
+- [ ] Después de continuar, otra web http vuelve a avisar (el permiso es solo para esa carga).
+- [ ] Proxmox/router por IP (`192.168.x.x`) y nombres `.local` abren sin aviso.
+- [ ] DNS cifrado «Automático» + Quad9: las webs cargan normal. Comprobar en `https://on.quad9.net` (dice «Yes»).
+- [ ] DNS «Estricto»: sigue funcionando; probar también con Mullvad (sin anuncios).
+- [ ] Huella digital: en `https://coveryourtracks.eff.org` el resultado mejora respecto a la desactivada.
+- [ ] Enlace con `?utm_source=x&fbclid=y`: al abrirlo, la dirección queda limpia.
+- [ ] Avisos de cookies: elpais.com, marca.com, 20minutos.es, xataka.com, as.com → se rechazan solos (o no aparecen). Anotar los que no.
+- [ ] Apagar «Rechazar avisos de cookies»: vuelven a salir los avisos.
+- [ ] GPC: en `https://global-privacy-control.glitch.me` sale detectado.
+- [ ] Proteger IP en videollamadas: en `https://browserleaks.com/webrtc` no aparece la IP local (192.168.x.x). Jitsi sigue funcionando.
+- [ ] Borrar datos al salir (activado): cerrar Brisa desde Recientes y volver → sin pestañas, sin historial y con las sesiones cerradas.
+- [ ] Permisos por web: dar ubicación a maps.google.com → aparece en la lista; «Quitar» → vuelve a preguntar.
+
+## 15. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 15. Velocidad (comparar con Chrome)
+## 16. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
