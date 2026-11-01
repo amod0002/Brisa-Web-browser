@@ -34,6 +34,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -201,6 +207,8 @@ class UiState {
     var privateLocked by mutableStateOf(false)
     /** Atajos de teclado: los recibe la actividad y los resuelve la pantalla. */
     var shortcut: ((String) -> Boolean)? = null
+    /** Centro del botón de descargas (para la animación del icono que vuela hasta él). */
+    var downloadTarget by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
     fun unlockPrivate(ctx: android.content.Context) {
         (ctx as? PromptHost)?.unlock("Ver tus pestañas privadas") { ok -> if (ok) privateLocked = false } ?: run { privateLocked = false }
     }
@@ -212,6 +220,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     val tab = tabs[current.coerceIn(0, tabs.lastIndex)]
     var showTabs by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showDownloads by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var collapsed by remember { mutableStateOf(false) }
     val geckoView = remember { GeckoView(ctx) }
@@ -278,8 +287,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             if (wide && !ui.fullScreen) {
                 TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
                     onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) },
-                    onNewTab = { newTab(tab.private) })
-                TabStrip(tabs, current, ui.privateLocked, select = { select(it) }, close = { closeTab(it) })
+                    onNewTab = { newTab(tab.private) }, ui = ui, onDownloads = { showDownloads = true })
                 if (tab.findText != null) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.widthIn(max = 640.dp)) { FindBar(tab) }
                 }
@@ -324,6 +332,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                         IconButton({ if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url) }, enabled = !tab.isHome) {
                             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
                         }
+                        DownloadButton(ui) { showDownloads = true }
                         IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) }) {
                             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                                 Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
@@ -336,7 +345,6 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
 
         var showHistory by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
-        var showDownloads by remember { mutableStateOf(false) }
         if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true })
         if (showDownloads) DownloadsSheet { showDownloads = false }
         ui.dialogs.toList().forEach { d -> key(d) { d { ui.dialogs.remove(d) } } }
@@ -352,6 +360,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
         if (showSettings) SettingsSheet { showSettings = false }
         if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
+
+        DownloadFly(ui)
 
         AnimatedVisibility(showTabs, enter = fadeIn() + scaleIn(initialScale = 1.1f), exit = fadeOut() + scaleOut(targetScale = 1.1f)) {
             TabGrid(tabs, current, ui, select = { select(it); showTabs = false }, onClose = { i -> closeTab(i) },
@@ -829,8 +839,9 @@ fun DownloadsSheet(dismiss: () -> Unit) {
         }
         if (Downloads.items.isEmpty()) Text("Lo que descargues aparecerá aquí y en Descargas/Brisa.", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(bottom = 16.dp)) {
-            items(Downloads.items.size) { i ->
+            items(Downloads.items.size, key = { System.identityHashCode(Downloads.items[it]) }) { i ->
                 val d = Downloads.items[i]
+                val smooth by animateFloatAsState(if (d.total > 0) d.done.toFloat() / d.total else 0f, tween(450), label = "progreso")
                 ListItem(
                     leadingContent = { Icon(when {
                         d.mime.startsWith("image") -> Icons.Outlined.Image
@@ -841,13 +852,13 @@ fun DownloadsSheet(dismiss: () -> Unit) {
                     headlineContent = { Text(d.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = {
                         if (d.status == "Descargando") Column {
-                            if (d.total > 0) LinearProgressIndicator({ d.done.toFloat() / d.total }, Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                            if (d.total > 0) LinearProgressIndicator({ smooth }, Modifier.fillMaxWidth().padding(vertical = 4.dp))
                             else LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
                             Text("${mb(d.done)} de ${mb(d.total)}")
                         } else Text(if (d.status == "Terminada") "${mb(d.total)} · ${fmt.format(java.util.Date(d.time))}" else d.status)
                     },
                     trailingContent = { if (d.status == "Descargando") IconButton({ d.cancel = true }) { Icon(Icons.Filled.Close, "Cancelar") } },
-                    modifier = Modifier.clickable(enabled = d.uri != null) { Downloads.open(ctx, d) })
+                    modifier = Modifier.animateItem().clickable(enabled = d.uri != null) { Downloads.open(ctx, d) })
             }
         }
     }
@@ -1093,7 +1104,7 @@ fun ReportSheet(dismiss: () -> Unit) {
 /** Barra de tablet: navegación a la izquierda, dirección en el centro, acciones a la derecha. */
 @Composable
 fun TabletToolbar(tab: Tab, tabCount: Int, favs: Favorites, editing: Boolean, setEditing: (Boolean) -> Unit,
-                  onMenu: () -> Unit, onTabs: () -> Unit, onNewTab: () -> Unit) {
+                  onMenu: () -> Unit, onTabs: () -> Unit, onNewTab: () -> Unit, ui: UiState, onDownloads: () -> Unit) {
     val ctx = LocalContext.current
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton({ tab.session.goBack() }, enabled = tab.canBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") }
@@ -1109,6 +1120,7 @@ fun TabletToolbar(tab: Tab, tabCount: Int, favs: Favorites, editing: Boolean, se
         IconButton({ if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url) }, enabled = !tab.isHome) {
             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
         }
+        DownloadButton(ui, onDownloads)
         IconButton(onNewTab) { Icon(Icons.Filled.Add, "Nueva pestaña") }
         IconButton(onTabs) {
             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
@@ -1118,34 +1130,98 @@ fun TabletToolbar(tab: Tab, tabCount: Int, favs: Favorites, editing: Boolean, se
     }
 }
 
-/** Tira de pestañas de tablet (solo las del modo actual: normales o privadas). */
+
+/**
+ * Botón de descargas con anillo de progreso. Aparece mientras hay descargas (y unos segundos después);
+ * al terminar se convierte en ✓ con un rebote y una vibración suave; si falla, el anillo se pone rojo.
+ */
 @Composable
-fun TabStrip(tabs: List<Tab>, current: Int, privateLocked: Boolean, select: (Int) -> Unit, close: (Int) -> Unit) {
-    val priv = tabs.getOrNull(current)?.private == true
-    val list = tabs.withIndex().filter { it.value.private == priv }
-    val state = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(current, list.size) {
-        val k = list.indexOfFirst { it.index == current }
-        if (k >= 0) state.animateScrollToItem(k)
+fun DownloadButton(ui: UiState, onClick: () -> Unit) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val seenFinished = remember { Downloads.finished }
+    val seenFailed = remember { Downloads.failed }
+    var recent by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    val bounce = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(Downloads.finished) {
+        if (Downloads.finished <= seenFinished) return@LaunchedEffect
+        recent = true; done = true; error = false
+        view.performHapticFeedback(if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.CONFIRM
+            else android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        bounce.animateTo(1.3f, spring(dampingRatio = 0.35f, stiffness = 600f))
+        bounce.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+        kotlinx.coroutines.delay(1800); done = false
+        kotlinx.coroutines.delay(3000); if (Downloads.progress() == null) recent = false
     }
-    androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth().height(40.dp), state = state,
-        contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        items(list.size, key = { System.identityHashCode(list[it].value) }) { k ->
-            val (i, t) = list[k]
-            val sel = i == current
-            val hidden = t.private && privateLocked
-            Row(Modifier.widthIn(min = 150.dp, max = 240.dp).height(34.dp).clip(RoundedCornerShape(10.dp))
-                .background(if (sel) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainer)
-                .clickable { select(i) }.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (hidden) Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp))
-                else if (t.isHome) Icon(Icons.Outlined.Home, null, Modifier.size(16.dp))
-                else SiteIcon(t.host, 16.dp, 4.dp)
-                Text(if (hidden) "Privada" else t.title.ifBlank { if (t.isHome) "Inicio" else t.host },
-                    Modifier.weight(1f).padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    fontSize = 13.sp, fontWeight = if (sel) FontWeight.Medium else FontWeight.Normal)
-                IconButton({ close(i) }, Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "Cerrar pestaña", Modifier.size(14.dp)) }
+    LaunchedEffect(Downloads.failed) {
+        if (Downloads.failed <= seenFailed) return@LaunchedEffect
+        recent = true; error = true
+        view.performHapticFeedback(if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.REJECT
+            else android.view.HapticFeedbackConstants.LONG_PRESS)
+        kotlinx.coroutines.delay(5000); if (Downloads.progress() == null) { recent = false; error = false }
+    }
+    val progress = Downloads.progress()
+    LaunchedEffect(progress != null) { if (progress != null) { recent = true; error = false } }
+    val smooth by animateFloatAsState((progress ?: 1f).coerceAtLeast(0f), tween(450), label = "anillo")
+
+    AnimatedVisibility(progress != null || recent, enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(), exit = scaleOut() + fadeOut()) {
+        IconButton(onClick, Modifier
+            .onGloballyPositioned { ui.downloadTarget = it.boundsInRoot().center }
+            .graphicsLayer { scaleX = bounce.value; scaleY = bounce.value }) {
+            Box(contentAlignment = Alignment.Center) {
+                val ringColor = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                if (progress != null && progress < 0f) CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.5.dp, color = ringColor)
+                else CircularProgressIndicator({ smooth }, Modifier.size(26.dp), strokeWidth = 2.5.dp, color = ringColor,
+                    trackColor = LocalContentColor.current.copy(alpha = 0.18f))
+                AnimatedContent(when { error -> 2; done -> 1; else -> 0 }, label = "icono") { st ->
+                    Icon(when (st) { 2 -> Icons.Filled.PriorityHigh; 1 -> Icons.Filled.Check; else -> Icons.Filled.ArrowDownward },
+                        "Descargas", Modifier.size(14.dp), tint = if (st == 2) MaterialTheme.colorScheme.error else LocalContentColor.current)
+                }
             }
+        }
+    }
+}
+
+/** Al empezar una descarga, un icono vuela desde el centro hasta el botón de descargas (en arco, como Safari). */
+@Composable
+fun DownloadFly(ui: UiState) {
+    val seen = remember { Downloads.started }
+    var flying by remember { mutableStateOf(false) }
+    val t = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Downloads.started) {
+        if (Downloads.started <= seen) return@LaunchedEffect
+        t.snapTo(0f); flying = true
+        kotlinx.coroutines.delay(80)   // dejar que aparezca el botón para saber dónde está
+        t.animateTo(1f, tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        flying = false
+    }
+    if (!flying) return
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val d = androidx.compose.ui.platform.LocalDensity.current
+        val w = with(d) { maxWidth.toPx() }; val h = with(d) { maxHeight.toPx() }
+        val from = androidx.compose.ui.geometry.Offset(w / 2, h / 2)
+        val to = ui.downloadTarget ?: androidx.compose.ui.geometry.Offset(w - with(d) { 60.dp.toPx() }, h - with(d) { 60.dp.toPx() })
+        val arc = with(d) { 140.dp.toPx() }
+        val half = with(d) { 28.dp.toPx() }
+        Box(Modifier
+            .offset {
+                val v = t.value
+                val x = from.x + (to.x - from.x) * v
+                val y = from.y + (to.y - from.y) * v - kotlin.math.sin(Math.PI * v).toFloat() * arc
+                androidx.compose.ui.unit.IntOffset((x - half).toInt(), (y - half).toInt())
+            }
+            .size(56.dp)
+            .graphicsLayer {
+                val v = t.value
+                val sc = 1.35f - 0.95f * v
+                scaleX = sc; scaleY = sc
+                alpha = if (v > 0.85f) ((1f - v) / 0.15f).coerceIn(0f, 1f) else 1f
+            }
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.ArrowDownward, null, tint = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }

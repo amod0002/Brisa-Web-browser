@@ -83,11 +83,17 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - Si una compilación falla, el registro completo queda en la rama `ci-log`.
 
 ## 0.9.3 · tablets
-- **Diseño de tablet** (ancho mínimo ≥ 600 dp y ventana ancha): barra arriba con dirección centrada y **tira de pestañas**; sugerencias desplegadas hacia abajo. En pantalla dividida estrecha vuelve el diseño de móvil.
+- **Diseño de tablet** (ancho mínimo ≥ 600 dp y ventana ancha): barra arriba con dirección centrada; las pestañas, con el mismo botón que en el móvil; sugerencias desplegadas hacia abajo. En pantalla dividida estrecha vuelve el diseño de móvil.
 - **Webs de escritorio por defecto en tablet** (como el iPad), cambiable por web en «aA» y en Ajustes.
 - **Inicio adaptado**: 5–8 favoritos por fila y contenido centrado.
 - **Atajos de teclado**: Ctrl+T/W/L/F/R/D, Ctrl+Tab, Ctrl+1…9, Ctrl+Mayús+N, Alt+←/→, F5.
 - Girar, plegar o redimensionar la ventana no recarga la página.
+
+## 0.9.4 · animación de descargas
+- El icono **vuela en arco** hasta un **botón de descargas con anillo de progreso** (móvil y tablet).
+- Al terminar: ✓ con rebote y vibración suave; si falla, anillo rojo. El botón se oculta solo.
+- Lista de descargas con entrada deslizante y barras suaves; sin mensajes de texto (salvo errores).
+- Tablet: fuera la tira de pestañas; se usan como en el móvil.
 
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).

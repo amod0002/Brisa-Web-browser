@@ -33,6 +33,19 @@ object Downloads {
     }
 
     val items = mutableStateListOf<Item>()
+    /** Contadores que disparan las animaciones (empieza, termina, falla). */
+    var started by androidx.compose.runtime.mutableIntStateOf(0); private set
+    var finished by androidx.compose.runtime.mutableIntStateOf(0); private set
+    var failed by androidx.compose.runtime.mutableIntStateOf(0); private set
+
+    /** Progreso conjunto de lo que se está descargando: null = nada; -1 = tamaño desconocido. */
+    fun progress(): Float? {
+        val active = items.filter { it.status == "Descargando" }
+        if (active.isEmpty()) return null
+        val known = active.filter { it.total > 0 }
+        if (known.isEmpty()) return -1f
+        return (known.sumOf { it.done }.toDouble() / known.sumOf { it.total }).toFloat().coerceIn(0f, 1f)
+    }
     private var loaded = false
 
     fun load(ctx: Context) {
@@ -71,11 +84,11 @@ object Downloads {
         fun toast(t: String) = main.post { Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show() }
         val item = Item(name, mime, System.currentTimeMillis())
         item.total = (r.headers["Content-Length"] ?: r.headers["content-length"])?.toLongOrNull() ?: -1
-        main.post { items.add(0, item) }
+        main.post { items.add(0, item); started++ }
 
         val body = r.body
         if (Build.VERSION.SDK_INT >= 29 && body != null) {
-            toast("Descargando $name…")
+            // Sin mensajes de texto: lo cuentan la animación y el botón de descargas
             Thread {
                 val res = ctx.contentResolver
                 val values = ContentValues().apply {
@@ -99,11 +112,10 @@ object Downloads {
                         }
                     }
                     res.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
-                    main.post { item.uri = uri; item.status = "Terminada"; persist(ctx) }
-                    toast("Descargado: $name")
+                    main.post { item.uri = uri; item.status = "Terminada"; persist(ctx); finished++ }
                 } catch (e: Exception) {
                     uri?.let { res.delete(it, null, null) }
-                    main.post { item.status = if (item.cancel) "Cancelada" else "Error" }
+                    main.post { item.status = if (item.cancel) "Cancelada" else "Error"; if (!item.cancel) failed++ }
                     if (!item.cancel) toast("No se pudo descargar $name")
                 }
             }.start()
