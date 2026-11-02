@@ -82,7 +82,7 @@ Reúne todo lo de la 0.1 a la 0.9.5: navegador Gecko 159 con estilo Safari y cri
 - **GeckoView 159** (antes 145): un año de parches de seguridad de Mozilla, más velocidad y compatibilidad.
 - **Android Gradle Plugin 9.1** con Kotlin integrado, **Kotlin 2.4**, **Gradle 9.8**, compilación contra **Android 37** (`targetSdk` sigue en 35).
 - Acciones de GitHub en Node 24 (`upload-artifact@v6`).
-- **Aviso mensual** (`.github/workflows/gecko.yml`): si Mozilla publica una GeckoView nueva, abre un issue. Funciona desde `main` (a partir de la 1.0).
+- **Aviso diario** (`.github/workflows/gecko.yml`): si Mozilla publica una GeckoView nueva, abre un issue. Funciona desde `main` (a partir de la 1.0).
 - Si una compilación falla, el registro completo queda en la rama `ci-log`.
 
 ## 0.9.3 · tablets

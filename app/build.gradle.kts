@@ -43,7 +43,7 @@ android {
 }
 
 dependencies {
-    // Motor Gecko (Firefox). Versión exacta: la comprueba cada mes .github/workflows/gecko.yml
+    // Motor Gecko (Firefox). Versión exacta: la comprueba cada día .github/workflows/gecko.yml
     implementation("org.mozilla.geckoview:geckoview:159.0.20261022150525")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3")
