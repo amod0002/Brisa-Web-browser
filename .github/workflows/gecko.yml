@@ -17,7 +17,10 @@ jobs:
           actual=$(grep -oP 'geckoview:geckoview:\K[0-9.]+' app/build.gradle.kts)
           ultima=$(curl -s https://maven.mozilla.org/maven2/org/mozilla/geckoview/geckoview/maven-metadata.xml \
             | grep -oP '<release>\K[^<]+')
-          echo "Brisa usa $actual · última publicada $ultima"
+          if [ -z "$ultima" ] || [ -z "$actual" ]; then
+            echo "::error::No se pudo leer la versión de GeckoView (actual='$actual', última='$ultima')."; exit 1
+          fi
+          echo "::notice::Brisa usa GeckoView $actual · última publicada $ultima"
           if [ -n "$ultima" ] && [ "$ultima" != "$actual" ]; then
             titulo="Actualizar GeckoView a $ultima"
             if ! gh issue list --state open --search "$titulo in:title" --json number --jq '.[0]' | grep -q number; then
