@@ -10,8 +10,8 @@ android {
         applicationId = "es.homelab.brisa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.9.5"
+        versionCode = 100
+        versionName = "1.0.0"
         // Solo arm64: el Pixel no necesita más y el APK pesa la mitad
         ndk { abiFilters += listOf("arm64-v8a") }
     }

@@ -2,6 +2,9 @@
 
 Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interfaz al estilo **Safari**. Kotlin + Jetpack Compose + Material You.
 
+## 1.0.0 · primera versión estable
+Reúne todo lo de la 0.1 a la 0.9.5: navegador Gecko 159 con estilo Safari y cristal, barra inferior (móvil) o superior (tablet), pestañas con grupos y privadas bloqueadas, favoritos y frecuentes, historial y sugerencias, descargas animadas que preguntan antes, modo lectura, contraseñas cifradas con generador, uBlock Origin, y la capa de seguridad y privacidad (solo HTTPS, DNS cifrado, huella digital, enlaces limpios, cookies rechazadas, GPC, WebRTC, permisos por web, informe y escudo por web).
+
 ## 0.1.0
 - Barra de direcciones **abajo** que se encoge al bajar por la página y vuelve al subir.
 - **Desliza la barra** a izquierda/derecha para cambiar de pestaña (al final, abre una nueva).
@@ -111,7 +114,7 @@ Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y l
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.
 
 ## Hoja de ruta hasta la 1.0
-- **1.0** · Repaso completo de PRUEBAS.md, paso de `dev` a `main`, Release.
+- **1.0** · ✅ Publicada.
 
 ## Después de la 1.0 (aparcado)
 - **Sincronización** de favoritos, historial y pestañas con un servicio propio en el homelab (contenedor Docker en Proxmox/Portainer). Sin fecha: no se empieza hasta que se decida.
