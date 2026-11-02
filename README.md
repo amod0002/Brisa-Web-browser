@@ -95,6 +95,17 @@ Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interf
 - Lista de descargas con entrada deslizante y barras suaves; sin mensajes de texto (salvo errores).
 - Tablet: fuera la tira de pestañas; se usan como en el móvil.
 
+## 0.9.5 · seguridad
+- **Firma propia**: la clave ya no está en el repositorio; llega desde los secretos `KEYSTORE_BASE64` y `KEYSTORE_PASSWORD`. Sin ellos se compila y se prueba, pero no sale APK. *(Cambio de firma: hay que reinstalar una vez.)*
+- **Sin copias de seguridad** de Android (ni nube ni traspaso a otro móvil).
+- **Extensiones**: solo uBlock Origin se instala sin preguntar; las demás piden confirmación con sus permisos.
+- **Otras apps solo pueden abrir webs** (`http`/`https`), nunca `file://`, `about:` o `javascript:`.
+- **Preguntar antes de descargar** (activado por defecto).
+- **Privadas sin rastro**: no guardan iconos y Brisa no sale en la miniatura de «Recientes» mientras haya alguna.
+- Las direcciones e IPs (incluidas las del homelab) **no se envían** al buscador para sugerencias.
+- Los iconos no pueden apuntar a la red local desde webs externas, sin redirecciones y con límite de 512 KB.
+- `about:config` desactivado.
+
 ## Compilar
 Ramas: **`dev`** para todo lo nuevo (Actions compila, pasa pruebas unitarias y lint y deja el APK como artefacto) → repaso de [PRUEBAS.md](PRUEBAS.md) en el Pixel → **`main`** → Release con etiqueta `vX.Y.Z` (creada desde GitHub → Releases → Draft a new release; Actions adjunta el APK).
 Solo genera APK para arm64 (Pixel). El APK pesa ~70 MB por el motor Gecko.

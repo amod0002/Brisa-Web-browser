@@ -29,6 +29,13 @@ object WebIcons {
         return null
     }
 
+    /** Solo http(s), y una web de internet no puede hacer que Brisa pida algo a la red local. */
+    fun allowed(pageHost: String, iconUrl: String): Boolean {
+        if (!iconUrl.startsWith("https://") && !iconUrl.startsWith("http://")) return false
+        val iconHost = History.hostOf(iconUrl)
+        return !Privacy.isLocal(iconHost) || Privacy.isLocal(pageHost)
+    }
+
     /** La página dice cuál es su icono: se descarga si no lo teníamos. */
     fun fetch(ctx: Context, host: String, iconUrl: String) {
         if (host.isBlank() || map.containsKey(host) || !pending.add(host)) return
@@ -38,8 +45,14 @@ object WebIcons {
                 if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 7L * 86_400_000) {
                     val c = URL(iconUrl).openConnection() as HttpURLConnection
                     c.connectTimeout = 5000; c.readTimeout = 5000
+                    c.instanceFollowRedirects = false   // una redirección podría apuntar a la red local
                     c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) Brisa")
-                    val bytes = c.inputStream.use { it.readBytes() }
+                    // Máximo 512 KB: un «icono» enorme no debe llenar la memoria
+                    val bytes = c.inputStream.use { inp ->
+                        val out = java.io.ByteArrayOutputStream(); val buf = ByteArray(16 * 1024); var n: Int
+                        while (inp.read(buf).also { n = it } >= 0) { out.write(buf, 0, n); if (out.size() > 512 * 1024) error("demasiado grande") }
+                        out.toByteArray()
+                    }
                     if (BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null) f.writeBytes(bytes)
                 }
                 BitmapFactory.decodeFile(f.path)?.let { map[host] = it.asImageBitmap() }

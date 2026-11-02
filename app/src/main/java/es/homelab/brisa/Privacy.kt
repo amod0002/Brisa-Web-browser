@@ -34,6 +34,7 @@ object Privacy {
     var webrtc by mutableStateOf(true); private set
     var clearOnExit by mutableStateOf(false); private set
     var lockPrivate by mutableStateOf(true); private set
+    var askDownloads by mutableStateOf(true); private set
 
 
     /** Parámetros de rastreo que se quitan de las direcciones. */
@@ -62,6 +63,7 @@ object Privacy {
         webrtc = prefs.getBoolean("webrtc", true)
         clearOnExit = prefs.getBoolean("borrar_salir", false)
         lockPrivate = prefs.getBoolean("bloquear_privadas", true)
+        askDownloads = prefs.getBoolean("preguntar_descargas", true)
     }
 
     /** Cambia un ajuste, lo guarda y lo aplica. */
@@ -77,6 +79,7 @@ object Privacy {
             "webrtc" -> webrtc = v as Boolean
             "borrar_salir" -> clearOnExit = v as Boolean
             "bloquear_privadas" -> lockPrivate = v as Boolean
+            "preguntar_descargas" -> askDownloads = v as Boolean
         }
         prefs.edit().apply {
             when (v) { is Int -> putInt(key, v); is Boolean -> putBoolean(key, v); is String -> putString(key, v) }

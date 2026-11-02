@@ -10,6 +10,9 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="Brisa"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@drawable/ic_launcher"
         android:usesCleartextTraffic="true"
         android:theme="@style/Brisa">

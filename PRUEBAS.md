@@ -170,13 +170,25 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Ya no salen los mensajes «Descargando…» / «Descargado».
 - [ ] Dos descargas a la vez: el anillo muestra el progreso conjunto.
 
-## 19. Android
+## 19. Novedades 0.9.5 · seguridad
+- [ ] **Primera vez:** desinstalar la versión anterior e instalar esta (cambia la firma). Volver a iniciar sesión donde haga falta.
+- [ ] Descargar un archivo: pregunta «¿Descargar este archivo?» con nombre, tamaño y web. «Cancelar» no descarga nada.
+- [ ] Ajustes → «Preguntar antes de descargar» apagado: descarga directa con la animación.
+- [ ] Con una pestaña privada abierta, la miniatura de Brisa en «Recientes» sale en blanco/gris.
+- [ ] En privadas, los iconos de las webs no se guardan (abrir una web nueva en privada; en una normal su icono aún no está).
+- [ ] Escribir `192.168.1.50` o `nube.local`: no salen sugerencias del buscador (sí las del historial).
+- [ ] Una web que intente instalar una extensión (addons.mozilla.org → «Añadir»): pide confirmación con los permisos.
+- [ ] Abrir desde otra app un enlace `https://…`: funciona. (Lo que no sea http/https se ignora.)
+- [ ] `about:config` ya no abre.
+- [ ] Ajustes de Android → Sistema → Copia de seguridad: Brisa no aparece/no copia datos.
+
+## 20. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 20. Velocidad (comparar con Chrome)
+## 21. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

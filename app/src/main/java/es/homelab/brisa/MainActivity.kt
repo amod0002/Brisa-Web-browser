@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
                     group = it.optString("group").ifEmpty { null }, lazy = true)
             }
         }
-        val incoming = intent?.dataString
+        val incoming = intent?.dataString?.let(::safeIncoming)
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
         current = tabs.lastIndex
@@ -169,7 +169,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.dataString?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
+        intent.dataString?.let(::safeIncoming)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
     }
 
     override fun onDestroy() {
@@ -249,6 +249,12 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     // Diseño de tablet: pantalla de tablet y ventana ancha (en pantalla dividida estrecha vuelve el de móvil)
     val conf = androidx.compose.ui.platform.LocalConfiguration.current
     val wide = conf.smallestScreenWidthDp >= 600 && conf.screenWidthDp >= 600
+
+    // Con pestañas privadas abiertas, Android no guarda la miniatura de Brisa en «Recientes»
+    val anyPrivate = tabs.any { it.private }
+    LaunchedEffect(anyPrivate) {
+        if (android.os.Build.VERSION.SDK_INT >= 33) (ctx as? android.app.Activity)?.setRecentsScreenshotEnabled(!anyPrivate)
+    }
 
     SideEffect {
         ui.shortcut = { k ->
@@ -392,7 +398,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
     var remote by remember { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(text, editing) {
         remote = emptyList()
-        if (!editing || tab.private || !Settings.suggest || text.isBlank() || text.contains("://")) return@LaunchedEffect
+        if (!editing || tab.private || !Settings.suggest || text.isBlank() || Settings.looksLikeAddress(text)) return@LaunchedEffect
         kotlinx.coroutines.delay(200)
         remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Settings.fetchSuggestions(text) }
             .filter { !it.equals(text.trim(), ignoreCase = true) }
@@ -998,6 +1004,7 @@ fun PrivacySection() {
     toggle("Rechazar avisos de cookies", "Pulsa «Rechazar» por ti en los avisos más comunes", Privacy.cookieBanners, "cookies")
     toggle("Pedir que no vendan tus datos", "Envía la señal Global Privacy Control a cada web", Privacy.gpc, "gpc")
     toggle("Proteger IP en videollamadas", "WebRTC no revela tu IP real (útil con VPN)", Privacy.webrtc, "webrtc")
+    toggle("Preguntar antes de descargar", "Ninguna web puede descargarte un archivo sin que lo confirmes", Privacy.askDownloads, "preguntar_descargas")
     toggle("Bloquear pestañas privadas", "Al volver a Brisa, piden huella o PIN para verlas", Privacy.lockPrivate, "bloquear_privadas")
     toggle("Borrar datos al salir", "Al cerrar Brisa se borran historial, cookies, caché y pestañas abiertas (cerrarás sesión en las webs)", Privacy.clearOnExit, "borrar_salir")
 
@@ -1224,4 +1231,10 @@ fun DownloadFly(ui: UiState) {
             Icon(Icons.Filled.ArrowDownward, null, tint = MaterialTheme.colorScheme.onPrimary)
         }
     }
+}
+
+/** Direcciones que otras apps pueden abrir en Brisa: solo webs (nada de file://, about:, javascript:…). */
+fun safeIncoming(s: String): String? {
+    val t = s.trim()
+    return if (t.startsWith("https://", true) || t.startsWith("http://", true)) t else null
 }

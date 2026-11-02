@@ -10,18 +10,28 @@ android {
         applicationId = "es.homelab.brisa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.9.4"
+        versionCode = 16
+        versionName = "0.9.5"
         // Solo arm64: el Pixel no necesita más y el APK pesa la mitad
         ndk { abiFilters += listOf("arm64-v8a") }
     }
+    // Firma de publicación: la clave NO está en el repositorio. En GitHub llega desde los secretos
+    // KEYSTORE_BASE64 y KEYSTORE_PASSWORD (ver .github/workflows/build.yml).
     signingConfigs {
-        getByName("debug") { storeFile = rootProject.file("debug.keystore") }
+        create("release") {
+            val ks = System.getenv("BRISA_KEYSTORE")
+            if (ks != null) {
+                storeFile = file(ks)
+                storePassword = System.getenv("BRISA_KEYSTORE_PASSWORD")
+                keyAlias = "brisa"
+                keyPassword = System.getenv("BRISA_KEYSTORE_PASSWORD")
+            }
+        }
     }
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("debug")
+            if (System.getenv("BRISA_KEYSTORE") != null) signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -34,7 +34,7 @@ object Engine {
                     .safeBrowsing(ContentBlocking.SafeBrowsing.DEFAULT)
                     .build()
             )
-            .aboutConfigEnabled(true)
+            .aboutConfigEnabled(false)
             .loginAutofillEnabled(true)
             .automaticFontSizeAdjustment(false)
             .fontSizeFactor(ctx.getSharedPreferences("ajustes", 0).getFloat("texto", 1f))
@@ -54,11 +54,30 @@ object Engine {
         rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
                 ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
-            ): GeckoResult<WebExtension.PermissionPromptResponse> =
-                GeckoResult.fromValue(WebExtension.PermissionPromptResponse(true, true, false))
+            ): GeckoResult<WebExtension.PermissionPromptResponse> {
+                // uBlock Origin lo instala Brisa: sin preguntar. Cualquier otra extensión, solo si el usuario acepta.
+                if (ext.id == UBLOCK_ID) return GeckoResult.fromValue(WebExtension.PermissionPromptResponse(true, false, false))
+                val r = GeckoResult<WebExtension.PermissionPromptResponse>()
+                val h = Tab.tabHost as? PromptHost ?: return GeckoResult.fromValue(WebExtension.PermissionPromptResponse(false, false, false))
+                var answered = false
+                fun answer(ok: Boolean) { if (!answered) { answered = true; r.complete(WebExtension.PermissionPromptResponse(ok, false, false)) } }
+                val name = ext.metaData.name ?: ext.id
+                h.show { close ->
+                    androidx.compose.material3.AlertDialog(onDismissRequest = { answer(false); close() },
+                        title = { androidx.compose.material3.Text("¿Instalar la extensión «$name»?") },
+                        text = { androidx.compose.material3.Text(
+                            (if (origins.any { it == "<all_urls>" || it.startsWith("*://*/") }) "Podrá leer y cambiar todo lo que veas en todas las webs.\n\n" else "") +
+                            "Permisos: " + (perms + origins).joinToString(", ").ifEmpty { "ninguno" }) },
+                        confirmButton = { androidx.compose.material3.TextButton({ answer(true); close() }) { androidx.compose.material3.Text("Instalar") } },
+                        dismissButton = { androidx.compose.material3.TextButton({ answer(false); close() }) { androidx.compose.material3.Text("Cancelar") } })
+                }
+                return r
+            }
             override fun onUpdatePrompt(
                 ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
-            ): GeckoResult<AllowOrDeny> = GeckoResult.fromValue(AllowOrDeny.ALLOW)
+            ): GeckoResult<AllowOrDeny> =
+                // Una actualización que pide permisos nuevos solo se acepta sola para uBlock
+                GeckoResult.fromValue(if (ext.id == UBLOCK_ID) AllowOrDeny.ALLOW else AllowOrDeny.DENY)
         }
     }
 
@@ -167,7 +186,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onTitleChange(s: GeckoSession, t: String?) {
                 title = t ?: ""; if (!private) History.get(ctx).title(url, title)
             }
-            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.save(ctx, r) }
+            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.ask(ctx, r, url) }
             override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
                 if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }
@@ -239,7 +258,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                                 "page" -> {
                                     readerable = j.optBoolean("readerable")
                                     val h = History.hostOf(j.optString("url"))
-                                    j.optString("icon").takeIf { it.startsWith("http") }?.let { WebIcons.fetch(ctx, h, it) }
+                                    val icon = j.optString("icon")
+                                    if (!private && WebIcons.allowed(h, icon)) WebIcons.fetch(ctx, h, icon)
                                 }
                                 "reader" -> reading = j.optBoolean("ok")
                             }

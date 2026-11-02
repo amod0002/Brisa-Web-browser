@@ -53,3 +53,25 @@ class PrivacyTest {
     }
     @Test fun listaDeRastreo() = org.junit.Assert.assertTrue("fbclid" in Privacy.STRIP && "utm_source" in Privacy.STRIP)
 }
+
+class SecurityTest {
+    @Test fun soloWebsDesdeOtrasApps() {
+        assertEquals("https://elpais.com", safeIncoming("https://elpais.com"))
+        org.junit.Assert.assertNull(safeIncoming("file:///data/data/es.homelab.brisa/files/contrasenas.bin"))
+        org.junit.Assert.assertNull(safeIncoming("javascript:alert(1)"))
+        org.junit.Assert.assertNull(safeIncoming("about:config"))
+        org.junit.Assert.assertNull(safeIncoming("resource://android/assets/"))
+    }
+    @Test fun direccionesNoVanAlBuscador() {
+        org.junit.Assert.assertTrue(Settings.looksLikeAddress("192.168.1.50:8006"))
+        org.junit.Assert.assertTrue(Settings.looksLikeAddress("nube.local"))
+        org.junit.Assert.assertTrue(Settings.looksLikeAddress("elpais.com/espana"))
+        org.junit.Assert.assertFalse(Settings.looksLikeAddress("recetas de ñoquis"))
+    }
+    @Test fun iconosNoTocanLaRedLocal() {
+        org.junit.Assert.assertFalse(WebIcons.allowed("evil.com", "http://192.168.1.1/admin"))
+        org.junit.Assert.assertFalse(WebIcons.allowed("evil.com", "file:///etc/hosts"))
+        org.junit.Assert.assertTrue(WebIcons.allowed("192.168.1.50", "http://192.168.1.50/favicon.ico"))
+        org.junit.Assert.assertTrue(WebIcons.allowed("elpais.com", "https://static.elpais.com/favicon.png"))
+    }
+}

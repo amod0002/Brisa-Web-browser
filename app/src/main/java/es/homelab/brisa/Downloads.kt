@@ -73,6 +73,27 @@ object Downloads {
         }.onFailure { Toast.makeText(ctx, "No hay ninguna app para abrir ${item.name}", Toast.LENGTH_SHORT).show() }
     }
 
+    /** Pregunta antes de descargar (se puede desactivar en Ajustes). Si se cancela, se cierra la conexión. */
+    fun ask(ctx: Context, r: WebResponse, pageUrl: String) {
+        if (!Privacy.askDownloads) { save(ctx, r); return }
+        val h = Tab.tabHost as? PromptHost ?: run { save(ctx, r); return }
+        val disp = r.headers["Content-Disposition"] ?: r.headers["content-disposition"]
+        val type = (r.headers["Content-Type"] ?: r.headers["content-type"])?.substringBefore(';')?.trim()
+        val name = URLUtil.guessFileName(r.uri, disp, type)
+        val size = (r.headers["Content-Length"] ?: r.headers["content-length"])?.toLongOrNull()
+        val sizeTxt = size?.let { if (it < 1_048_576) "${it / 1024} KB" else String.format(java.util.Locale("es"), "%.1f MB", it / 1_048_576.0) }
+        val from = History.hostOf(r.uri).ifBlank { History.hostOf(pageUrl) }
+        var answered = false
+        h.show { close ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { if (!answered) { answered = true; runCatching { r.body?.close() } }; close() },
+                title = { androidx.compose.material3.Text("¿Descargar este archivo?") },
+                text = { androidx.compose.material3.Text(listOfNotNull(name, sizeTxt, "de $from").joinToString(" · ")) },
+                confirmButton = { androidx.compose.material3.TextButton({ answered = true; close(); save(ctx, r) }) { androidx.compose.material3.Text("Descargar") } },
+                dismissButton = { androidx.compose.material3.TextButton({ answered = true; runCatching { r.body?.close() }; close() }) { androidx.compose.material3.Text("Cancelar") } })
+        }
+    }
+
     fun save(ctx: Context, r: WebResponse) {
         load(ctx)
         val disp = r.headers["Content-Disposition"] ?: r.headers["content-disposition"]

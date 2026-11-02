@@ -46,5 +46,12 @@ object Settings {
     fun setSearch(ctx: Context, t: String) {
         search = t; ctx.getSharedPreferences("ajustes", 0).edit().putString("buscador", t).apply()
     }
+    /** Lo que parece una dirección (dominio, IP, ruta) no se manda al buscador para sugerencias. */
+    fun looksLikeAddress(t: String): Boolean {
+        val s = t.trim()
+        if (s.contains("://") || Privacy.isLocal(s.substringBefore('/'))) return true
+        return !s.contains(' ') && (s.contains('.') || s.contains(':') || s.contains('/'))
+    }
+
     fun isValidTemplate(t: String) = t.startsWith("http") && t.contains("%s")
 }
