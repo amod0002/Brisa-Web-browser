@@ -165,15 +165,43 @@ object Privacy {
             Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(h) || Regex("^100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.").containsMatchIn(h)
     }
 
-    /** «Continuar sin seguridad»: se permite HTTP solo para la siguiente carga y se vuelve a cerrar. */
-    var insecureOnce = false
-    fun allowInsecureOnce(ctx: Context) {
-        insecureOnce = true
+    /**
+     * «Continuar sin seguridad»: HTTP se permite solo para la carga de ESA pestaña. Se vuelve a cerrar
+     * cuando termina esa carga o a los 15 s, lo que ocurra antes. Mientras tanto, las webs http que
+     * intenten abrir otras pestañas se retienen y se cargan después, ya con «Solo HTTPS».
+     */
+    @Volatile var insecureOnce = false; private set
+    @Volatile private var insecureSession: org.mozilla.geckoview.GeckoSession? = null
+    private val heldLoads = mutableListOf<Pair<org.mozilla.geckoview.GeckoSession, String>>()
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    private var timeout: Runnable? = null
+
+    fun allowInsecureOnce(ctx: Context, s: org.mozilla.geckoview.GeckoSession) {
+        insecureOnce = true; insecureSession = s
         Engine.get(ctx).settings.setAllowInsecureConnections(GeckoRuntimeSettings.ALLOW_ALL)
+        timeout?.let(main::removeCallbacks)
+        timeout = Runnable { closeInsecure(ctx) }.also { main.postDelayed(it, 15_000) }
     }
-    fun restoreAfterLoad(ctx: Context) {
+
+    fun restoreAfterLoad(ctx: Context, s: org.mozilla.geckoview.GeckoSession) {
+        if (insecureOnce && s === insecureSession) closeInsecure(ctx)
+    }
+
+    /** Otra pestaña quiere abrir una web http mientras está abierta la excepción: se retiene. */
+    fun holdDuringInsecure(s: org.mozilla.geckoview.GeckoSession, uri: String): Boolean {
+        if (!insecureOnce || s === insecureSession || !uri.startsWith("http://", true)) return false
+        if (isLocal(History.hostOf(uri))) return false
+        synchronized(heldLoads) { heldLoads += s to uri }
+        return true
+    }
+
+    private fun closeInsecure(ctx: Context) {
         if (!insecureOnce) return
-        insecureOnce = false
+        insecureOnce = false; insecureSession = null
+        timeout?.let(main::removeCallbacks); timeout = null
         apply(ctx)
+        val held = synchronized(heldLoads) { heldLoads.toList().also { heldLoads.clear() } }
+        held.forEach { (ses, u) -> if (ses.isOpen) ses.loadUri(u) }
     }
+
 }

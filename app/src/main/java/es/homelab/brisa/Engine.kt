@@ -179,7 +179,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
-            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx) }
+            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
@@ -200,6 +200,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
+            // Mientras otra pestaña tiene «Continuar sin seguridad», esta no puede abrir webs http (se retienen)
+            override fun onLoadRequest(s: GeckoSession, req: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? =
+                if (Privacy.holdDuringInsecure(s, req.uri)) GeckoResult.fromValue(AllowOrDeny.DENY) else null
             // Gecko nos da el permiso de «rastreo» de cada web: sirve para el escudo por web.
             override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
                 trackingPerm = perms.firstOrNull { it.permission == GeckoSession.PermissionDelegate.PERMISSION_TRACKING }
@@ -215,7 +218,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                         text = { androidx.compose.material3.Text("Lo que envíes o veas en esta web podría leerlo alguien de tu red. Brisa la ha bloqueado porque tienes activado «Solo HTTPS».") },
                         confirmButton = { androidx.compose.material3.TextButton({ close(); if (canBack) s.goBack() }) { androidx.compose.material3.Text("Volver") } },
                         dismissButton = { androidx.compose.material3.TextButton({
-                            close(); Privacy.allowInsecureOnce(ctx); s.loadUri(uri.replaceFirst("https://", "http://"))
+                            close(); Privacy.allowInsecureOnce(ctx, s); s.loadUri(uri.replaceFirst("https://", "http://"))
                         }) { androidx.compose.material3.Text("Continuar sin seguridad") } })
                 }
                 return null
