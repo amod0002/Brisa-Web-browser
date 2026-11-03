@@ -130,3 +130,13 @@ class RedLocalTest {
         org.junit.Assert.assertFalse(Net.isLocalAddress(ip("2a00:1450:4003::1")))
     }
 }
+
+class BarraLocalTest {
+    @Test fun localhost() = assertEquals("http://localhost:3000", Tab.toUrl("localhost:3000"))
+    @Test fun nombrePuerto() = assertEquals("http://proxmox:8006", Tab.toUrl("proxmox:8006"))
+    @Test fun ipv6() = assertEquals("http://[fd00::1]:8080", Tab.toUrl("[fd00::1]:8080"))
+    @Test fun nombreRuta() = assertEquals("http://nas/admin", Tab.toUrl("nas/admin"))
+    @Test fun dominioLocal() = assertEquals("http://nube.lan", Tab.toUrl("nube.lan"))
+    @Test fun busquedaIgual() = assertEquals("https://duckduckgo.com/?q=recetas+de+%C3%B1oquis", Tab.toUrl("recetas de ñoquis"))
+    @Test fun palabraSueltaBusca() = assertEquals("https://duckduckgo.com/?q=proxmox", Tab.toUrl("proxmox"))
+}

@@ -322,11 +322,23 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     companion object {
         var tabHost: TabHost? = null
         /** Texto escrito → URL: dirección si lo parece, si no búsqueda en DuckDuckGo. */
+        private val LOCAL_SUFFIXES = listOf("local", "lan", "home", "home.arpa", "internal", "localdomain")
+
         fun toUrl(s: String, search: String = "https://duckduckgo.com/?q=%s"): String {
             val t = s.trim()
+            val host = t.substringBefore('/').substringBefore(':').lowercase()
             return when {
-                t.matches(Regex("^[a-zA-Z]+://.*")) -> t
+                t.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) -> t
+                // IPv6 entre corchetes: [fd00::1]:8080
+                t.matches(Regex("^\\[[0-9a-fA-F:.]+](:\\d+)?(/.*)?$")) -> "http://$t"
+                // IPv4
                 t.matches(Regex("^(\\d{1,3}\\.){3}\\d{1,3}(:\\d+)?(/.*)?$")) -> "http://$t"
+                // localhost, nombre:puerto (proxmox:8006), nombre/ruta (nas/admin)
+                t.matches(Regex("^localhost(:\\d+)?(/.*)?$", RegexOption.IGNORE_CASE)) -> "http://$t"
+                t.matches(Regex("^[a-zA-Z0-9-]+:\\d+(/.*)?$")) -> "http://$t"
+                t.matches(Regex("^[a-zA-Z0-9-]+/\\S*$")) -> "http://$t"
+                // dominios de red local: .lan, .local, .home.arpa…
+                !t.contains(' ') && LOCAL_SUFFIXES.any { host.endsWith(".$it") } -> "http://$t"
                 !t.contains(' ') && t.contains('.') -> "https://$t"
                 else -> search.replace("%s", java.net.URLEncoder.encode(t, "UTF-8"))
             }
