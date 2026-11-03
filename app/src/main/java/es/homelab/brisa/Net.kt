@@ -31,6 +31,8 @@ object Net {
         addrs.isNullOrEmpty() || addrs.any(::isLocalAddress)
     } catch (_: Throwable) { true }
 
+    // Combinar ANONYMOUS y NO_REDIRECTS es válido; lint no reconoce la combinación con «or»
+    @android.annotation.SuppressLint("WrongConstant")
     /** GET anónimo; devuelve el cuerpo (máximo [maxBytes]) o null si falla o no es 2xx. */
     fun get(ctx: Context, url: String, maxBytes: Int, timeoutMs: Long = 5000): ByteArray? = try {
         val req = WebRequest.Builder(url).method("GET").build()
