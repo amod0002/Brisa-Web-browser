@@ -2,6 +2,9 @@
 
 Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interfaz al estilo **Safari**. Kotlin + Jetpack Compose + Material You.
 
+## 1.0.2
+- **Autorrelleno de Android** (issue #2): la vista de Gecko participa de forma explícita en el autorrelleno del sistema, para que gestores como Bitwarden, 1Password o KeePassDX ofrezcan rellenar usuario y contraseña.
+
 ## 1.0.1
 - **DNS propio** (issue #1): en DNS cifrado, opción «Propio» con la dirección DoH de tu servidor (AdGuard Home, Pi-hole con DoH, NextDNS…). Se valida que sea `https://` y avisa si lo usas en modo estricto.
 

@@ -190,13 +190,20 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Volver a Quad9: la dirección propia sigue guardada en el campo.
 - [ ] «Estricto» + DNS propio: sale el aviso en rojo.
 
-## 21. Android
+## 21. Novedades 1.0.2 · autorrelleno de Android (Bitwarden)
+- [ ] Ajustes de Android → Contraseñas y autorrelleno → servicio: Bitwarden.
+- [ ] En un login (p. ej. github.com/login): al tocar el usuario aparece la sugerencia de Bitwarden (encima del teclado o como desplegable).
+- [ ] Elegir la cuenta: rellena usuario y contraseña.
+- [ ] Al enviar un login nuevo, Bitwarden ofrece guardarlo.
+- [ ] Con el servicio de autorrelleno en «Ninguno», el gestor de contraseñas propio de Brisa sigue funcionando.
+
+## 22. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 22. Velocidad (comparar con Chrome)
+## 23. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

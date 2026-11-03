@@ -223,7 +223,13 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     var showDownloads by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var collapsed by remember { mutableStateOf(false) }
-    val geckoView = remember { GeckoView(ctx) }
+    val geckoView = remember {
+        GeckoView(ctx).apply {
+            // Autorrelleno de Android (Bitwarden, 1Password, KeePassDX…): Gecko describe los campos de la web a Android
+            setAutofillEnabled(true)
+            importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
+        }
+    }
     val favs = remember { Favorites(ctx) }
 
     LaunchedEffect(tab) {
@@ -299,7 +305,10 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                 }
             }
             Box(Modifier.weight(1f)) {
-                AndroidView({ geckoView }, Modifier.fillMaxSize())
+                AndroidView({ geckoView }, Modifier.fillMaxSize(), update = { v ->
+                    // El contenedor de Compose no debe ocultar la web al autorrelleno de Android
+                    (v.parent as? android.view.View)?.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
+                })
                 if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
                 if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
             }
