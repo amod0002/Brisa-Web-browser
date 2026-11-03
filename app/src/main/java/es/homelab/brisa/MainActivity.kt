@@ -779,6 +779,16 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 Switch(Settings.desktopTablet, { Settings.changeDesktopTablet(ctx, it) })
             }
             Text("Contraseñas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            Passwords.quarantined?.let { f ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("No se han podido leer tus contraseñas guardadas", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("Puede pasar si cambiaste el bloqueo de pantalla o el archivo se dañó. No se ha borrado nada: está apartado como «${f.name}» dentro de Brisa. Las contraseñas nuevas se guardarán aparte.",
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(top = 4.dp))
+                        TextButton({ Passwords.dismissQuarantine() }) { Text("Entendido") }
+                    }
+                }
+            }
             var showPw by remember { mutableStateOf(false) }
             OutlinedButton({
                 (ctx as? PromptHost)?.unlock("Ver tus contraseñas guardadas") { ok -> if (ok) showPw = true } ?: run { showPw = true }

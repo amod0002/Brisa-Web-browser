@@ -89,3 +89,22 @@ class DnsPropioTest {
         org.junit.Assert.assertFalse(Privacy.isValidDoh("https://mi dns/x"))
     }
 }
+
+class PasswordsQuarantineTest {
+    @Test fun archivoDanadoSeAparta() {
+        val dir = java.nio.file.Files.createTempDirectory("brisa").toFile()
+        val f = java.io.File(dir, "contrasenas.bin").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        var parsed = false
+        val (list, apartado) = Passwords.readOrQuarantine(f, { error("no se descifra") }, { parsed = true; emptyList() })
+        org.junit.Assert.assertTrue(list.isEmpty())
+        org.junit.Assert.assertFalse(parsed)
+        org.junit.Assert.assertFalse("el original no debe quedarse para sobrescribirse", f.exists())
+        org.junit.Assert.assertNotNull(apartado)
+        org.junit.Assert.assertArrayEquals(byteArrayOf(1, 2, 3), apartado!!.readBytes())
+    }
+    @Test fun sinArchivoNoHayAviso() {
+        val dir = java.nio.file.Files.createTempDirectory("brisa").toFile()
+        val (list, apartado) = Passwords.readOrQuarantine(java.io.File(dir, "contrasenas.bin"), { it }, { emptyList() })
+        org.junit.Assert.assertTrue(list.isEmpty()); org.junit.Assert.assertNull(apartado)
+    }
+}

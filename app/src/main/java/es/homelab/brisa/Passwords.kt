@@ -52,7 +52,30 @@ object Passwords : Autocomplete.StorageDelegate {
         prefs = ctx.getSharedPreferences("contrasenas", 0)
         offerSave = prefs.getBoolean("ofrecer", true)
         never = prefs.getStringSet("nunca", emptySet())!!.toSet()
-        logins = runCatching { parse(decrypt(file.readBytes())) }.getOrDefault(emptyList())
+        val (list, apartado) = readOrQuarantine(file, ::decrypt, ::parse)
+        logins = list
+        quarantined = apartado
+    }
+
+    /**
+     * Si las contraseñas guardadas no se pueden leer (clave del Keystore invalidada, archivo dañado…),
+     * el archivo NO se sobrescribe: se aparta como contrasenas.bin.roto-<fecha> y se avisa en Ajustes.
+     */
+    var quarantined by mutableStateOf<File?>(null)
+        private set
+    fun dismissQuarantine() { quarantined = null }
+
+    /** Tres casos: no existe (vacía), se lee bien, o existe y no se lee (se aparta y se devuelve el apartado). */
+    internal fun readOrQuarantine(f: File, dec: (ByteArray) -> ByteArray, parser: (ByteArray) -> List<Login>): Pair<List<Login>, File?> {
+        if (!f.exists()) return emptyList<Login>() to null
+        return try {
+            parser(dec(f.readBytes())) to null
+        } catch (e: Throwable) {
+            val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date())
+            val dest = File(f.parentFile, f.name + ".roto-" + stamp)
+            if (!f.renameTo(dest)) { f.copyTo(dest, overwrite = false); f.delete() }
+            emptyList<Login>() to dest
+        }
     }
 
     fun changeOfferSave(v: Boolean) { offerSave = v; prefs.edit().putBoolean("ofrecer", v).apply() }
@@ -100,7 +123,9 @@ object Passwords : Autocomplete.StorageDelegate {
             .put("created", it.created).put("used", it.lastUsed)) }
         val tmp = File(file.path + ".tmp")
         tmp.writeBytes(encrypt(a.toString().toByteArray(Charsets.UTF_8)))
-        tmp.renameTo(file)
+        // Copia de la versión anterior antes de sustituirla
+        if (file.exists()) runCatching { file.copyTo(File(file.path + ".bak"), overwrite = true) }
+        if (!tmp.renameTo(file)) { tmp.copyTo(file, overwrite = true); tmp.delete() }
     }
 
     // ---- Operaciones ---------------------------------------------------------------------------
