@@ -140,3 +140,21 @@ class BarraLocalTest {
     @Test fun busquedaIgual() = assertEquals("https://duckduckgo.com/?q=recetas+de+%C3%B1oquis", Tab.toUrl("recetas de ñoquis"))
     @Test fun palabraSueltaBusca() = assertEquals("https://duckduckgo.com/?q=proxmox", Tab.toUrl("proxmox"))
 }
+
+class PasswordMatchTest {
+    private fun l(origin: String) = Passwords.Login("g-$origin", origin, null, null, "yo", "x", 0, 0)
+    @Test fun httpsNoSeOfreceEnHttp() {
+        val all = listOf(l("https://a.com"))
+        assertEquals(0, Passwords.match(all, "a.com", "http://a.com/login").size)
+        assertEquals(1, Passwords.match(all, "a.com", "https://a.com/login").size)
+    }
+    @Test fun homelabConPuerto() {
+        val all = listOf(l("http://192.168.1.50:8006"))
+        assertEquals(1, Passwords.match(all, "192.168.1.50", "http://192.168.1.50:8006/").size)
+        assertEquals(0, Passwords.match(all, "192.168.1.50", "http://192.168.1.50:9000/").size)
+    }
+    @Test fun sinSubdominiosCruzados() {
+        val all = listOf(l("https://a.com"))
+        assertEquals(0, Passwords.match(all, "evil.a.com", "https://evil.a.com/").size)
+    }
+}

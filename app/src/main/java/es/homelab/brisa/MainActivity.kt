@@ -234,6 +234,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
 
     LaunchedEffect(tab) {
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
+        Tab.visible = tab
         tab.session.setActive(true); tab.wake()
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
         tabs.forEach { if (it !== tab) it.session.setActive(false) }

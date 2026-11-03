@@ -149,10 +149,30 @@ object Passwords : Autocomplete.StorageDelegate {
     fun isKnown(e: Autocomplete.LoginEntry) = logins.any { it.origin == e.origin && it.username == (e.username ?: "") && it.password == e.password }
 
     // ---- Gecko pide/guarda ---------------------------------------------------------------------
-    override fun onLoginFetch(domain: String): GeckoResult<Array<Autocomplete.LoginEntry>> {
-        val h = domain.removePrefix("www.")
-        return GeckoResult.fromValue(logins.filter { it.host == h || it.host.endsWith(".$h") || h.endsWith(".${it.host}") }
-            .map { it.toEntry() }.toTypedArray())
+    override fun onLoginFetch(domain: String): GeckoResult<Array<Autocomplete.LoginEntry>> =
+        GeckoResult.fromValue(match(logins, domain, Tab.visible?.url).map { it.toEntry() }.toTypedArray())
+
+    private fun hostOnly(origin: String): String =
+        runCatching { java.net.URI(origin).host }.getOrNull()?.lowercase()?.removePrefix("www.")?.removePrefix("[")?.removeSuffix("]") ?: ""
+    private fun port(origin: String): Int = runCatching { java.net.URI(origin).let { u ->
+        if (u.port != -1) u.port else if (u.scheme == "https") 443 else 80 } }.getOrDefault(-1)
+
+    /**
+     * Qué contraseñas se ofrecen en [domain]: mismo servidor (sin subdominios cruzados). Si sabemos la página
+     * (la pestaña visible es de ese servidor), además mismo puerto, y una guardada en https NUNCA se ofrece
+     * en http, salvo en la red local (homelab).
+     */
+    internal fun match(all: List<Login>, domain: String, pageUrl: String?): List<Login> {
+        val h = domain.lowercase().removePrefix("www.").removePrefix("[").removeSuffix("]")
+        val page = pageUrl?.takeIf { hostOnly(it) == h }
+        return all.filter { l ->
+            if (hostOnly(l.origin) != h) return@filter false
+            if (page == null) return@filter true
+            if (port(l.origin) != port(page)) return@filter false
+            val savedHttps = l.origin.startsWith("https://", true)
+            val pageHttp = page.startsWith("http://", true)
+            !(savedHttps && pageHttp && !Privacy.isLocal(h))
+        }
     }
 
     override fun onLoginFetch(): GeckoResult<Array<Autocomplete.LoginEntry>> =

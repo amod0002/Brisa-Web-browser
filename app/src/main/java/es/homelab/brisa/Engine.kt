@@ -321,6 +321,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
 
     companion object {
         var tabHost: TabHost? = null
+        /** Pestaña que se está viendo (para saber el esquema y puerto de la página al rellenar contraseñas). */
+        @Volatile var visible: Tab? = null
         /** Texto escrito → URL: dirección si lo parece, si no búsqueda en DuckDuckGo. */
         private val LOCAL_SUFFIXES = listOf("local", "lan", "home", "home.arpa", "internal", "localdomain")
 
