@@ -27,6 +27,8 @@ object Privacy {
     // DNS cifrado: 0 = no, 1 = automático (si falla, DNS normal), 2 = estricto
     var dohMode by mutableIntStateOf(1); private set
     var dohUri by mutableStateOf(DOH.getValue("Quad9")); private set
+    /** Servidor DNS propio (DoH), p. ej. AdGuard Home o NextDNS. Se guarda aunque no esté elegido. */
+    var dohCustom by mutableStateOf(""); private set
     var fingerprint by mutableStateOf(true); private set
     var stripLinks by mutableStateOf(true); private set
     var cookieBanners by mutableStateOf(true); private set
@@ -56,6 +58,7 @@ object Privacy {
         httpsOnly = prefs.getInt("https", 2)
         dohMode = prefs.getInt("doh", 1)
         dohUri = prefs.getString("doh_uri", dohUri)!!
+        dohCustom = prefs.getString("doh_propio", "")!!
         fingerprint = prefs.getBoolean("huella", true)
         stripLinks = prefs.getBoolean("enlaces", true)
         cookieBanners = prefs.getBoolean("cookies", true)
@@ -72,6 +75,7 @@ object Privacy {
             "https" -> httpsOnly = v as Int
             "doh" -> dohMode = v as Int
             "doh_uri" -> dohUri = v as String
+            "doh_propio" -> dohCustom = v as String
             "huella" -> fingerprint = v as Boolean
             "enlaces" -> stripLinks = v as Boolean
             "cookies" -> cookieBanners = v as Boolean
@@ -136,6 +140,14 @@ object Privacy {
     fun clearAll(ctx: Context, done: () -> Unit = {}) {
         History.get(ctx).clear()
         Engine.get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
+    }
+
+    /** Un DNS propio tiene que ser DNS sobre HTTPS: https://servidor/ruta (sin espacios). */
+    fun isValidDoh(u: String): Boolean {
+        val t = u.trim()
+        if (!t.startsWith("https://") || t.contains(' ')) return false
+        val host = t.removePrefix("https://").substringBefore('/').substringBefore(':')
+        return host.isNotEmpty() && (host.contains('.') || host == "localhost")
     }
 
     /** Las IPs y nombres de la red local no tienen HTTPS: Gecko no los fuerza (para Proxmox, router…). */

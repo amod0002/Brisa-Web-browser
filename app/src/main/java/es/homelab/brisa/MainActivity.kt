@@ -993,10 +993,36 @@ fun PrivacySection() {
     Text("Tu operadora no ve qué webs visitas. «Automático» usa el DNS normal si el cifrado falla; «Estricto» nunca.",
         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     choice(listOf("No", "Automático", "Estricto"), Privacy.dohMode, "doh")
-    if (Privacy.dohMode > 0) Privacy.DOH.forEach { (name, uri) ->
-        Row(Modifier.fillMaxWidth().clickable { Privacy.set(ctx, "doh_uri", uri) }, verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(Privacy.dohUri == uri, { Privacy.set(ctx, "doh_uri", uri) }); Text(name)
+    if (Privacy.dohMode > 0) {
+        Privacy.DOH.forEach { (name, uri) ->
+            Row(Modifier.fillMaxWidth().clickable { Privacy.set(ctx, "doh_uri", uri) }, verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(Privacy.dohUri == uri, { Privacy.set(ctx, "doh_uri", uri) }); Text(name)
+            }
         }
+        // DNS propio (AdGuard Home, Pi-hole con DoH, NextDNS…)
+        var custom by remember { mutableStateOf(Privacy.dohCustom) }
+        val valid = Privacy.isValidDoh(custom)
+        val usingCustom = Privacy.dohCustom.isNotEmpty() && Privacy.dohUri == Privacy.dohCustom
+        Row(Modifier.fillMaxWidth().clickable(enabled = valid) { Privacy.set(ctx, "doh_propio", custom.trim()); Privacy.set(ctx, "doh_uri", custom.trim()) },
+            verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(usingCustom, { if (valid) { Privacy.set(ctx, "doh_propio", custom.trim()); Privacy.set(ctx, "doh_uri", custom.trim()) } }, enabled = valid)
+            Text("Propio")
+        }
+        OutlinedTextField(custom, { v ->
+                custom = v
+                // Si ya estaba elegido, se aplica al escribir una dirección válida
+                if (usingCustom && Privacy.isValidDoh(v)) { Privacy.set(ctx, "doh_propio", v.trim()); Privacy.set(ctx, "doh_uri", v.trim()) }
+            },
+            Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp), singleLine = true,
+            label = { Text("DNS propio (DNS sobre HTTPS)") },
+            placeholder = { Text("https://dns.midominio.es/dns-query") },
+            isError = custom.isNotEmpty() && !valid,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
+            supportingText = { Text(
+                if (custom.isNotEmpty() && !valid) "Tiene que empezar por https:// (DNS sobre HTTPS)"
+                else "Necesita un certificado válido. Si falla, usa «Automático»: en «Estricto» te quedarías sin internet.") })
+        if (usingCustom && Privacy.dohMode == 2) Text("Estás en modo estricto con tu DNS propio: si ese servidor se cae, no cargará ninguna web.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 12.dp))
     }
 
     toggle("Protección contra huella digital", "Las webs no pueden identificarte por las características del móvil", Privacy.fingerprint, "huella")

@@ -182,13 +182,21 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] `about:config` ya no abre.
 - [ ] Ajustes de Android → Sistema → Copia de seguridad: Brisa no aparece/no copia datos.
 
-## 20. Android
+## 20. Novedades 1.0.1 · DNS propio
+- [ ] Ajustes → DNS cifrado «Automático»: aparece «Propio» con un campo de texto.
+- [ ] Escribir `http://…` o una IP sola: se marca en rojo y «Propio» no se puede elegir.
+- [ ] Escribir una dirección válida (p. ej. `https://dns.nextdns.io/<tu id>` o la de tu AdGuard) y elegir «Propio»: las webs cargan. En NextDNS/AdGuard aparecen las consultas.
+- [ ] Cerrar y abrir Brisa: sigue elegido el DNS propio.
+- [ ] Volver a Quad9: la dirección propia sigue guardada en el campo.
+- [ ] «Estricto» + DNS propio: sale el aviso en rojo.
+
+## 21. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 21. Velocidad (comparar con Chrome)
+## 22. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

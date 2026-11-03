@@ -75,3 +75,17 @@ class SecurityTest {
         org.junit.Assert.assertTrue(WebIcons.allowed("elpais.com", "https://static.elpais.com/favicon.png"))
     }
 }
+
+class DnsPropioTest {
+    @Test fun validos() {
+        org.junit.Assert.assertTrue(Privacy.isValidDoh("https://dns.midominio.es/dns-query"))
+        org.junit.Assert.assertTrue(Privacy.isValidDoh("https://dns.nextdns.io/abc123"))
+        org.junit.Assert.assertTrue(Privacy.isValidDoh("https://adguard.casa.lan:8443/dns-query"))
+    }
+    @Test fun invalidos() {
+        org.junit.Assert.assertFalse(Privacy.isValidDoh("http://dns.midominio.es/dns-query"))
+        org.junit.Assert.assertFalse(Privacy.isValidDoh("192.168.1.2"))
+        org.junit.Assert.assertFalse(Privacy.isValidDoh("https://"))
+        org.junit.Assert.assertFalse(Privacy.isValidDoh("https://mi dns/x"))
+    }
+}

@@ -2,6 +2,9 @@
 
 Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interfaz al estilo **Safari**. Kotlin + Jetpack Compose + Material You.
 
+## 1.0.1
+- **DNS propio** (issue #1): en DNS cifrado, opción «Propio» con la dirección DoH de tu servidor (AdGuard Home, Pi-hole con DoH, NextDNS…). Se valida que sea `https://` y avisa si lo usas en modo estricto.
+
 ## 1.0.0 · primera versión estable
 Reúne todo lo de la 0.1 a la 0.9.5: navegador Gecko 159 con estilo Safari y cristal, barra inferior (móvil) o superior (tablet), pestañas con grupos y privadas bloqueadas, favoritos y frecuentes, historial y sugerencias, descargas animadas que preguntan antes, modo lectura, contraseñas cifradas con generador, uBlock Origin, y la capa de seguridad y privacidad (solo HTTPS, DNS cifrado, huella digital, enlaces limpios, cookies rechazadas, GPC, WebRTC, permisos por web, informe y escudo por web).
 
