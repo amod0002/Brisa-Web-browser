@@ -409,7 +409,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         remote = emptyList()
         if (!editing || tab.private || !Settings.suggest || text.isBlank() || Settings.looksLikeAddress(text)) return@LaunchedEffect
         kotlinx.coroutines.delay(200)
-        remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Settings.fetchSuggestions(text) }
+        remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Settings.fetchSuggestions(ctx, text) }
             .filter { !it.equals(text.trim(), ignoreCase = true) }
     }
     var barWidth by remember { mutableIntStateOf(0) }

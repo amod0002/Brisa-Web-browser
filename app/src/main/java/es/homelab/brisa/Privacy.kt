@@ -152,8 +152,15 @@ object Privacy {
 
     /** Las IPs y nombres de la red local no tienen HTTPS: Gecko no los fuerza (para Proxmox, router…). */
     fun isLocal(host: String): Boolean {
-        val h = host.substringBefore(':')
-        return h == "localhost" || LOCAL_DOMAINS.any { h.endsWith(".$it") } ||
+        val t = host.trim().lowercase()
+        // IPv6 entre corchetes: [::1], [fd00::1]:8080, [fe80::1]
+        if (t.startsWith("[")) {
+            val ip = t.removePrefix("[").substringBefore(']')
+            return ip == "::1" || ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe8") || ip.startsWith("fe9") ||
+                ip.startsWith("fea") || ip.startsWith("feb")
+        }
+        val h = t.substringBefore(':').substringBefore('/')
+        return h == "localhost" || LOCAL_DOMAINS.any { h.endsWith(".$it") } || Regex("^169\\.254\\.").containsMatchIn(h) ||
             Regex("^(10|127)\\.").containsMatchIn(h) || Regex("^192\\.168\\.").containsMatchIn(h) ||
             Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(h) || Regex("^100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.").containsMatchIn(h)
     }

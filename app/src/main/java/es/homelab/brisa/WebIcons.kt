@@ -6,8 +6,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 
 /** Iconos de las webs: los indica la propia página (extensión) y se guardan en disco por dominio. */
@@ -43,16 +41,13 @@ object WebIcons {
             try {
                 val f = file(ctx, host)
                 if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 7L * 86_400_000) {
-                    val c = URL(iconUrl).openConnection() as HttpURLConnection
-                    c.connectTimeout = 5000; c.readTimeout = 5000
-                    c.instanceFollowRedirects = false   // una redirección podría apuntar a la red local
-                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) Brisa")
-                    // Máximo 512 KB: un «icono» enorme no debe llenar la memoria
-                    val bytes = c.inputStream.use { inp ->
-                        val out = java.io.ByteArrayOutputStream(); val buf = ByteArray(16 * 1024); var n: Int
-                        while (inp.read(buf).also { n = it } >= 0) { out.write(buf, 0, n); if (out.size() > 512 * 1024) error("demasiado grande") }
-                        out.toByteArray()
-                    }
+                    // Una web de internet no puede hacer que Brisa toque la red local, ni con un nombre
+                    // que resuelva a una IP privada (DNS rebinding): se comprueban las IPs reales.
+                    val hp = iconUrl.substringAfter("://").substringBefore('/').substringAfter('@')
+                    val iconHost = if (hp.startsWith("[")) hp.substringBefore(']') + "]" else hp.substringBefore(':')
+                    if (!Privacy.isLocal(host) && Net.resolvesToLocal(ctx, iconHost)) error("apunta a la red local")
+                    // Con la red de Gecko (DNS cifrado, sin cookies, sin redirecciones), máximo 512 KB
+                    val bytes = Net.get(ctx, iconUrl, 512 * 1024) ?: error("sin icono")
                     if (BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null) f.writeBytes(bytes)
                 }
                 BitmapFactory.decodeFile(f.path)?.let { map[host] = it.asImageBitmap() }

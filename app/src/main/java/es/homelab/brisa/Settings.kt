@@ -36,11 +36,10 @@ object Settings {
     }
 
     /** Sugerencias del buscador mientras se escribe (servicio de DuckDuckGo, no guarda historial). */
-    fun fetchSuggestions(q: String): List<String> = runCatching {
-        val c = java.net.URL("https://duckduckgo.com/ac/?type=list&q=" + java.net.URLEncoder.encode(q, "UTF-8"))
-            .openConnection() as java.net.HttpURLConnection
-        c.connectTimeout = 2500; c.readTimeout = 2500
-        val a = org.json.JSONArray(c.inputStream.bufferedReader().readText()).getJSONArray(1)
+    fun fetchSuggestions(ctx: Context, q: String): List<String> = runCatching {
+        // Con la red de Gecko: pasa por el DNS cifrado y sin identificar a Brisa
+        val body = Net.get(ctx, "https://duckduckgo.com/ac/?type=list&q=" + java.net.URLEncoder.encode(q, "UTF-8"), 64 * 1024, 2500)!!
+        val a = org.json.JSONArray(String(body, Charsets.UTF_8)).getJSONArray(1)
         (0 until a.length()).map { a.getString(it) }.take(4)
     }.getOrDefault(emptyList())
     fun setSearch(ctx: Context, t: String) {

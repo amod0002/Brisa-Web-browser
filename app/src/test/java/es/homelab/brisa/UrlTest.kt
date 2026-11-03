@@ -108,3 +108,25 @@ class PasswordsQuarantineTest {
         org.junit.Assert.assertTrue(list.isEmpty()); org.junit.Assert.assertNull(apartado)
     }
 }
+
+class RedLocalTest {
+    @Test fun ipv6Locales() {
+        org.junit.Assert.assertTrue(Privacy.isLocal("[::1]"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("[fd00::1]:8080"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("[fe80::1]"))
+        org.junit.Assert.assertFalse(Privacy.isLocal("[2a00:1450::1]"))
+        org.junit.Assert.assertTrue(Privacy.isLocal("169.254.1.1"))
+    }
+    @Test fun direccionesIpLocales() {
+        fun ip(s: String) = java.net.InetAddress.getByName(s)
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("192.168.1.1")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("10.0.0.5")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("100.100.1.1")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("127.0.0.1")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("fd12::1")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("fe80::1")))
+        org.junit.Assert.assertTrue(Net.isLocalAddress(ip("::1")))
+        org.junit.Assert.assertFalse(Net.isLocalAddress(ip("8.8.8.8")))
+        org.junit.Assert.assertFalse(Net.isLocalAddress(ip("2a00:1450:4003::1")))
+    }
+}
