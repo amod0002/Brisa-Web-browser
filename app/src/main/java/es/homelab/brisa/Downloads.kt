@@ -1,6 +1,5 @@
 package es.homelab.brisa
 
-import android.app.DownloadManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -24,7 +23,8 @@ import org.mozilla.geckoview.WebResponse
  * en versiones anteriores, con el gestor del sistema.
  */
 object Downloads {
-    class Item(val name: String, val mime: String, val time: Long) {
+    /** [private]: descarga de una pestaña privada (no se guarda en la lista al cerrar la app). */
+    class Item(val name: String, val mime: String, val time: Long, val private: Boolean = false) {
         var uri by androidx.compose.runtime.mutableStateOf<Uri?>(null)
         var done by androidx.compose.runtime.mutableLongStateOf(0L)
         var total by androidx.compose.runtime.mutableLongStateOf(-1L)
@@ -47,6 +47,7 @@ object Downloads {
         return (known.sumOf { it.done }.toDouble() / known.sumOf { it.total }).toFloat().coerceIn(0f, 1f)
     }
     private var loaded = false
+    private var askedNotifications = false
 
     fun load(ctx: Context) {
         if (loaded) return; loaded = true
@@ -60,7 +61,7 @@ object Downloads {
     }
 
     private fun persist(ctx: Context) = ctx.getSharedPreferences("descargas", 0).edit().putString("l",
-        items.filter { it.status == "Terminada" }.take(100)
+        items.filter { it.status == "Terminada" && !it.private }.take(100)
             .joinToString("\n") { "${it.name}\t${it.mime}\t${it.time}\t${it.uri ?: ""}\t${it.total}" }).apply()
 
     fun clear(ctx: Context) { items.removeAll { it.status != "Descargando" }; persist(ctx) }
@@ -74,9 +75,9 @@ object Downloads {
     }
 
     /** Pregunta antes de descargar (se puede desactivar en Ajustes). Si se cancela, se cierra la conexión. */
-    fun ask(ctx: Context, r: WebResponse, pageUrl: String) {
-        if (!Privacy.askDownloads) { save(ctx, r); return }
-        val h = Tab.tabHost as? PromptHost ?: run { save(ctx, r); return }
+    fun ask(ctx: Context, r: WebResponse, pageUrl: String, private: Boolean = false) {
+        if (!Privacy.askDownloads) { save(ctx, r, private); return }
+        val h = Tab.tabHost as? PromptHost ?: run { save(ctx, r, private); return }
         val disp = r.headers["Content-Disposition"] ?: r.headers["content-disposition"]
         val type = (r.headers["Content-Type"] ?: r.headers["content-type"])?.substringBefore(';')?.trim()
         val name = URLUtil.guessFileName(r.uri, disp, type)
@@ -89,12 +90,12 @@ object Downloads {
                 onDismissRequest = { if (!answered) { answered = true; runCatching { r.body?.close() } }; close() },
                 title = { androidx.compose.material3.Text("¿Descargar este archivo?") },
                 text = { androidx.compose.material3.Text(listOfNotNull(name, sizeTxt, "de $from").joinToString(" · ")) },
-                confirmButton = { androidx.compose.material3.TextButton({ answered = true; close(); save(ctx, r) }) { androidx.compose.material3.Text("Descargar") } },
+                confirmButton = { androidx.compose.material3.TextButton({ answered = true; close(); save(ctx, r, private) }) { androidx.compose.material3.Text("Descargar") } },
                 dismissButton = { androidx.compose.material3.TextButton({ answered = true; runCatching { r.body?.close() }; close() }) { androidx.compose.material3.Text("Cancelar") } })
         }
     }
 
-    fun save(ctx: Context, r: WebResponse) {
+    fun save(ctx: Context, r: WebResponse, private: Boolean = false) {
         load(ctx)
         val disp = r.headers["Content-Disposition"] ?: r.headers["content-disposition"]
         val type = (r.headers["Content-Type"] ?: r.headers["content-type"])?.substringBefore(';')?.trim()
@@ -103,25 +104,23 @@ object Downloads {
         val mime = type ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.')) ?: "application/octet-stream"
         val main = Handler(Looper.getMainLooper())
         fun toast(t: String) = main.post { Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show() }
-        val item = Item(name, mime, System.currentTimeMillis())
+        val item = Item(name, mime, System.currentTimeMillis(), private)
         item.total = (r.headers["Content-Length"] ?: r.headers["content-length"])?.toLongOrNull() ?: -1
+        val body = r.body ?: run { toast("No se pudo descargar $name"); return }
         main.post { items.add(0, item); started++ }
+        val host = Tab.tabHost as? PromptHost
 
-        val body = r.body
-        if (Build.VERSION.SDK_INT >= 29 && body != null) {
-            // Sin mensajes de texto: lo cuentan la animación y el botón de descargas
+        // Notificaciones (Android 13+) para ver el progreso fuera de la app; si se niegan, se descarga igual
+        if (Build.VERSION.SDK_INT >= 33 && !askedNotifications) { askedNotifications = true
+            host?.androidPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)) { } }
+
+        fun copy(open: () -> Pair<java.io.OutputStream, () -> Uri?>, onFail: () -> Unit) {
+            // Servicio en primer plano: Android no corta la descarga aunque salgas de Brisa
+            DownloadService.start(ctx)
             Thread {
-                val res = ctx.contentResolver
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, name)
-                    put(MediaStore.Downloads.MIME_TYPE, mime)
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Brisa")
-                    put(MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val uri = res.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 try {
-                    uri ?: error("sin destino")
-                    res.openOutputStream(uri)!!.use { out ->
+                    val (out, finish) = open()
+                    out.use {
                         body.use { inp ->
                             val buf = ByteArray(64 * 1024); var n: Int; var got = 0L; var last = 0L
                             while (inp.read(buf).also { n = it } >= 0) {
@@ -132,22 +131,51 @@ object Downloads {
                             main.post { item.done = got; if (item.total < 0) item.total = got }
                         }
                     }
-                    res.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+                    val uri = finish()
                     main.post { item.uri = uri; item.status = "Terminada"; persist(ctx); finished++ }
                 } catch (e: Exception) {
-                    uri?.let { res.delete(it, null, null) }
+                    runCatching(onFail)
                     main.post { item.status = if (item.cancel) "Cancelada" else "Error"; if (!item.cancel) failed++ }
                     if (!item.cancel) toast("No se pudo descargar $name")
                 }
             }.start()
+        }
+
+        if (Build.VERSION.SDK_INT >= 29) {
+            val res = ctx.contentResolver
+            var uri: Uri? = null
+            copy({
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(MediaStore.Downloads.MIME_TYPE, mime)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Brisa")
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val u = res.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("sin destino")
+                uri = u
+                res.openOutputStream(u)!! to {
+                    res.update(u, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null); u
+                }
+            }, { uri?.let { res.delete(it, null, null) } })
         } else {
-            val dm = ctx.getSystemService(DownloadManager::class.java)
-            dm.enqueue(DownloadManager.Request(Uri.parse(r.uri))
-                .setTitle(name)
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Brisa/$name"))
-            main.post { item.status = "En el gestor del sistema" }
-            toast("Descargando $name…")
+            // Android 8-9: se guarda el mismo flujo que abrió Gecko (con su sesión y cookies), no se vuelve a pedir
+            val perm = android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            val go = { granted: Boolean ->
+                @Suppress("DEPRECATION")
+                val dir = if (granted) java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Brisa")
+                          else ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)!!
+                dir.mkdirs()
+                var f = java.io.File(dir, name); var k = 1
+                while (f.exists()) { f = java.io.File(dir, name.substringBeforeLast('.') + " ($k)" + (if (name.contains('.')) "." + name.substringAfterLast('.') else "")); k++ }
+                val file = f
+                copy({
+                    java.io.FileOutputStream(file) to {
+                        android.media.MediaScannerConnection.scanFile(ctx, arrayOf(file.path), arrayOf(mime), null)
+                        androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".archivos", file)
+                    }
+                }, { file.delete() })
+            }
+            if (host != null) host.androidPermissions(arrayOf(perm)) { ok -> go(ok) } else go(false)
         }
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8-9: carpetas desde las que Brisa puede abrir lo descargado -->
+<paths>
+    <external-path name="descargas" path="Download/Brisa/" />
+    <external-files-path name="app" path="Download/" />
+</paths>

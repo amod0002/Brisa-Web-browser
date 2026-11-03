@@ -186,7 +186,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onTitleChange(s: GeckoSession, t: String?) {
                 title = t ?: ""; if (!private) History.get(ctx).title(url, title)
             }
-            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.ask(ctx, r, url) }
+            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.ask(ctx, r, url, private) }
             override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
                 if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }
