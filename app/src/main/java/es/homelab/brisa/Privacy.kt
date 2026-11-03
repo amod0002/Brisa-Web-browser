@@ -173,7 +173,8 @@ object Privacy {
     @Volatile var insecureOnce = false; private set
     @Volatile private var insecureSession: org.mozilla.geckoview.GeckoSession? = null
     private val heldLoads = mutableListOf<Pair<org.mozilla.geckoview.GeckoSession, String>>()
-    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    // Perezoso: así Privacy se puede usar en pruebas fuera del móvil
+    private val main by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
     private var timeout: Runnable? = null
 
     fun allowInsecureOnce(ctx: Context, s: org.mozilla.geckoview.GeckoSession) {
