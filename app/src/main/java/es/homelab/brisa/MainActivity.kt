@@ -260,7 +260,11 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     // Con pestañas privadas abiertas, Android no guarda la miniatura de Brisa en «Recientes»
     val anyPrivate = tabs.any { it.private }
     LaunchedEffect(anyPrivate) {
-        if (android.os.Build.VERSION.SDK_INT >= 33) (ctx as? android.app.Activity)?.setRecentsScreenshotEnabled(!anyPrivate)
+        val act = ctx as? android.app.Activity
+        // Con pestañas privadas: sin capturas de pantalla ni miniatura en «Recientes»
+        if (anyPrivate) act?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        else act?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        if (android.os.Build.VERSION.SDK_INT >= 33) act?.setRecentsScreenshotEnabled(!anyPrivate)
     }
 
     SideEffect {
