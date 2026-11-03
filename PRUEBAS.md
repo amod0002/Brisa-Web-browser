@@ -197,13 +197,23 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Al enviar un login nuevo, Bitwarden ofrece guardarlo.
 - [ ] Con el servicio de autorrelleno en «Ninguno», el gestor de contraseñas propio de Brisa sigue funcionando.
 
-## 22. Android
+## 22. Novedades 1.0.3 · issues #3–#11
+- [ ] Contraseñas: siguen todas al instalar encima; se rellenan en `https://…` y en el homelab con puerto (`http://192.168.x.x:8006`).
+- [ ] Una contraseña guardada en `https://web` NO se ofrece en `http://web` (probar con «Solo HTTPS» en «No»).
+- [ ] Con una pestaña privada abierta no se pueden hacer capturas y Recientes sale en negro; cerrándola vuelven.
+- [ ] Iconos y sugerencias siguen funcionando (ahora por el DNS cifrado).
+- [ ] «Continuar sin seguridad» en una web http y, a la vez, otra pestaña abriendo otra web http: la segunda carga después y avisa.
+- [ ] Barra: `localhost:3000`, `proxmox:8006`, `nas/admin`, `[fd00::1]:8080`, `nube.lan` abren como dirección; `proxmox` busca y ofrece «Ir a http://proxmox/».
+- [ ] Descarga grande: sale notificación con progreso; salir de Brisa no la corta.
+- [ ] Descarga desde una pestaña privada: no aparece en la lista al reabrir la app; la notificación no muestra el nombre.
+
+## 23. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 23. Velocidad (comparar con Chrome)
+## 24. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.

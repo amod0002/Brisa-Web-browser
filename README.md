@@ -2,6 +2,16 @@
 
 Navegador Android con el motor **Gecko** (GeckoView, el de Firefox) y una interfaz al estilo **Safari**. Kotlin + Jetpack Compose + Material You.
 
+## 1.0.3 · revisión de la comunidad (issues #3–#11, gracias @perritys)
+- **Contraseñas** (#3): si no se pueden leer, el archivo se aparta (`contrasenas.bin.roto-<fecha>`) y se avisa en Ajustes; nunca se sobrescribe. Copia `.bak` antes de cada guardado.
+- **Contraseñas** (#8): se emparejan por origen (esquema, servidor y puerto); una de `https` nunca se ofrece en `http` (salvo red local). Arreglado el relleno en webs con puerto (`192.168.1.50:8006`).
+- **Privadas** (#4): `FLAG_SECURE` mientras haya alguna abierta: sin capturas ni miniatura en Recientes.
+- **Red** (#5, #6): iconos y sugerencias con la red de Gecko (DNS cifrado, anónimas, sin redirecciones). Se comprueban las IPs resueltas para frenar el *DNS rebinding*; IPv6 local incluida. Sin tráfico en claro fuera de Gecko.
+- **Solo HTTPS** (#7): «Continuar sin seguridad» vale solo para esa pestaña, se cierra al terminar su carga o a los 15 s, y las demás pestañas no abren `http` mientras tanto.
+- **Barra** (#9): `localhost:3000`, `proxmox:8006`, `nas/admin`, IPv6 (`[fd00::1]:8080`) y `.lan`/`.local`/`.home.arpa` son direcciones. Una palabra suelta ofrece «Ir a http://…/».
+- **Descargas** (#10): servicio en primer plano con notificación (no se cortan al salir); Android 8-9 guarda el flujo de Gecko con su sesión; las de pestañas privadas no quedan en la lista.
+- **Mantenimiento** (#11): `MainActivity.kt` dividido por pantallas, Gradle fijado (9.8.2), historial guardado en segundo plano y más pruebas (cuarentena de contraseñas, emparejado por origen, IPv6, IPs locales, barra).
+
 ## 1.0.2
 - **Autorrelleno de Android** (issue #2): la vista de Gecko participa de forma explícita en el autorrelleno del sistema, para que gestores como Bitwarden, 1Password o KeePassDX ofrezcan rellenar usuario y contraseña.
 

@@ -9,7 +9,7 @@ jobs:
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v5
-        with: { gradle-version: current }
+        with: { gradle-version: "9.8.2" }
       - name: Clave de firma (secretos del repositorio)
         env:
           KS: ${{ secrets.KEYSTORE_BASE64 }}

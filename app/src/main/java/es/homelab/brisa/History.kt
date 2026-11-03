@@ -17,9 +17,20 @@ class History private constructor(ctx: Context) {
         val p = it.split('\t'); if (p.size >= 3) Entry(p[0], p[1], p[2].toLongOrNull() ?: 0, p.getOrNull(3)?.toIntOrNull() ?: 1) else null
     }
 
-    private fun save() = prefs.edit().putString("l", entries.joinToString("\n") {
-        "${it.url}\t${it.title.replace('\t', ' ').replace('\n', ' ')}\t${it.time}\t${it.visits}"
-    }).apply()
+    /** Se guarda en segundo plano y agrupado: muchas visitas seguidas = una sola escritura. */
+    private val writer = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var dirty = false
+    private fun save() {
+        dirty = true
+        writer.execute {
+            if (!dirty) return@execute
+            dirty = false
+            val snapshot = entries
+            prefs.edit().putString("l", snapshot.joinToString("\n") {
+                "${it.url}\t${it.title.replace('\t', ' ').replace('\n', ' ')}\t${it.time}\t${it.visits}"
+            }).commit()
+        }
+    }
 
     fun visit(url: String) {
         if (!url.startsWith("http")) return
