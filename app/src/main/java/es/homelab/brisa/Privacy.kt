@@ -137,9 +137,18 @@ object Privacy {
     }
 
     // ---- Borrar al salir --------------------------------------------------------------------------
+    /**
+     * Borra todo rastro de navegación: historial, cookies, caché, datos de las webs, y también la caché de
+     * iconos (un archivo por web visitada), el informe de privacidad y la lista de descargas (#20).
+     * Los archivos descargados en Descargas/Brisa no se tocan: son tuyos.
+     */
     fun clearAll(ctx: Context, done: () -> Unit = {}) {
+        val rt = Engine.get(ctx)
         History.get(ctx).clear()
-        Engine.get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
+        WebIcons.clear(ctx)
+        Report.clear()
+        Downloads.load(ctx); Downloads.clear(ctx)
+        rt.storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
     }
 
     /** Un DNS propio tiene que ser DNS sobre HTTPS: https://servidor/ruta (sin espacios). */

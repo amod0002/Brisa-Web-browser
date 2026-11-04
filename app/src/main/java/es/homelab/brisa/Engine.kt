@@ -94,10 +94,8 @@ object Engine {
     fun withBuiltIn(cb: (WebExtension) -> Unit) { builtIn?.let(cb) ?: waiting.add(cb) }
 
     /** Borra cookies, caché y datos de todas las webs, y el historial. */
-    fun clearData(ctx: Context, done: () -> Unit) {
-        History.get(ctx).clear()
-        get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
-    }
+    /** Ajustes → «Borrar historial, cookies y caché»: la misma limpieza completa que «Borrar datos al salir». */
+    fun clearData(ctx: Context, done: () -> Unit) = Privacy.clearAll(ctx, done)
 
     /** Tamaño del texto de las webs (0,8 – 1,6), para todas las pestañas. */
     fun setTextSize(ctx: Context, f: Float) {
