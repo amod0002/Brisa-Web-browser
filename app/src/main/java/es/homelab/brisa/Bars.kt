@@ -341,3 +341,21 @@ fun SiteIcon(host: String, size: androidx.compose.ui.unit.Dp, corner: androidx.c
             color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
+
+/** Barra de una pestaña privada bloqueada: sin dominio ni dirección. Tocar = desbloquear; se puede ir a las pestañas. */
+@Composable
+fun LockedBar(tabCount: Int, onUnlock: () -> Unit, onTabs: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(50.dp).glass(RoundedCornerShape(25.dp), tint = PrivateGlass).padding(start = 16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clickable(onClick = onUnlock), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp), tint = glassContent(true))
+            Text("Pestaña privada bloqueada · Desbloquear", color = glassContent(true), fontSize = 15.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp))
+        }
+        IconButton(onTabs) {
+            Box(Modifier.size(22.dp).border(1.6.dp, glassContent(true), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = glassContent(true))
+            }
+        }
+    }
+}
