@@ -147,12 +147,9 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
         current = tabs.lastIndex
-        // Pantalla a la máxima frecuencia (90/120 Hz) y una pestaña nueva ya preparada
-        if (android.os.Build.VERSION.SDK_INT >= 30) display?.let { d ->
-            val now = d.mode
-            d.supportedModes.filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
-                .maxByOrNull { it.refreshRate }?.let { m -> window.attributes = window.attributes.apply { preferredDisplayModeId = m.modeId } }
-        }
+        // La frecuencia de pantalla la decide Android (sube a 90/120 Hz al moverse y baja con la página quieta,
+        // que es como ahorra batería). Forzar el modo máximo lo impedía (#22).
+        // Pestaña nueva ya preparada:
         window.decorView.postDelayed({ Engine.warm(this) }, 2000)
         window.decorView.postDelayed({
             Engine.autoUblock(this) { ok ->
