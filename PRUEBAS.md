@@ -215,6 +215,8 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] «aA» → uBlock Origin activo → abre su panel (ajustes, filtros, estadísticas) en una pestaña nueva.
 - [ ] Informe de privacidad → botón «Estadísticas y filtros de uBlock Origin».
 - [ ] Barra: `file:///sdcard` o `intent://…` se buscan; `about:blank` abre.
+- [ ] Icono nuevo (brújula de viento) en el lanzador: ocupa la forma del lanzador, sin borde blanco.
+- [ ] Con «Iconos temáticos» activados (Fondo de pantalla y estilo), el icono coge los colores del sistema.
 
 ## 24. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
