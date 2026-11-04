@@ -38,7 +38,34 @@ interface PromptHost {
  * Ventanas que piden las webs: alert/confirm/prompt, desplegables, usuario y contraseña (HTTP),
  * subir archivos, fecha y hora.
  */
-class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : PromptDelegate {
+class Prompts(private val ctx: Context, private val host: () -> PromptHost?, private val pageUrl: () -> String = { "" }) : PromptDelegate {
+
+    // ---- #21: una web no puede encerrarte a base de alert() -----------------------------------------
+    private var blockDialogs = false
+    private var dialogCount = 0
+    private var firstDialogAt = 0L
+    /** Al cargar otra página se vuelven a permitir los diálogos. */
+    fun resetDialogs() { blockDialogs = false; dialogCount = 0 }
+    /** Cuenta el diálogo; devuelve true si ya toca ofrecer «Impedir más diálogos» (2.º en 30 s). */
+    private fun countDialog(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - firstDialogAt > 30_000) { dialogCount = 0; firstDialogAt = now }
+        dialogCount++
+        return dialogCount >= 2
+    }
+    /** Quién habla: el dominio de la página, para que un aviso de una pestaña de fondo no parezca de la visible. */
+    private fun site() = History.hostOf(pageUrl()).ifBlank { "Esta página" }
+
+    @Composable
+    private fun Body(message: String?, offerBlock: Boolean, stop: Boolean, onStop: (Boolean) -> Unit, extra: @Composable () -> Unit = {}) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text(message ?: "")
+            extra()
+            if (offerBlock) Row(Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onStop(!stop) }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(stop, onStop); Text("Impedir que esta página cree más diálogos", Modifier.padding(start = 4.dp))
+            }
+        }
+    }
 
     private fun <T : BasePrompt> ask(p: T, d: (T, (PromptResponse) -> Unit) -> Dialog): GeckoResult<PromptResponse> {
         val r = GeckoResult<PromptResponse>()
@@ -50,29 +77,49 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : P
         return r
     }
 
-    override fun onAlertPrompt(s: GeckoSession, p: AlertPrompt) = ask(p) { pr, done ->
-        { close -> AlertDialog(onDismissRequest = { close() },
-            title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-            text = { Text(pr.message ?: "") },
-            confirmButton = { TextButton({ done(pr.dismiss()); close() }) { Text("Aceptar") } }) }
+    override fun onAlertPrompt(s: GeckoSession, p: AlertPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.dismiss())
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.dismiss()); close() }) { Text("Aceptar") } })
+            }
+        }
     }
 
-    override fun onButtonPrompt(s: GeckoSession, p: ButtonPrompt) = ask(p) { pr, done ->
-        { close -> AlertDialog(onDismissRequest = { close() },
-            title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-            text = { Text(pr.message ?: "") },
-            confirmButton = { TextButton({ done(pr.confirm(ButtonPrompt.Type.POSITIVE)); close() }) { Text("Aceptar") } },
-            dismissButton = { TextButton({ done(pr.confirm(ButtonPrompt.Type.NEGATIVE)); close() }) { Text("Cancelar") } }) }
+    override fun onButtonPrompt(s: GeckoSession, p: ButtonPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.confirm(ButtonPrompt.Type.NEGATIVE))
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(ButtonPrompt.Type.POSITIVE)); close() }) { Text("Aceptar") } },
+                    dismissButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(ButtonPrompt.Type.NEGATIVE)); close() }) { Text("Cancelar") } })
+            }
+        }
     }
 
-    override fun onTextPrompt(s: GeckoSession, p: TextPrompt) = ask(p) { pr, done ->
-        { close ->
-            var v by remember { mutableStateOf(pr.defaultValue ?: "") }
-            AlertDialog(onDismissRequest = { close() },
-                title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-                text = { Column { Text(pr.message ?: ""); OutlinedTextField(v, { v = it }, Modifier.padding(top = 12.dp), singleLine = true) } },
-                confirmButton = { TextButton({ done(pr.confirm(v)); close() }) { Text("Aceptar") } },
-                dismissButton = { TextButton({ close() }) { Text("Cancelar") } })
+    override fun onTextPrompt(s: GeckoSession, p: TextPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.dismiss())
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var v by remember { mutableStateOf(pr.defaultValue ?: "") }
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) {
+                        OutlinedTextField(v, { v = it }, Modifier.padding(top = 12.dp), singleLine = true) } },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(v)); close() }) { Text("Aceptar") } },
+                    dismissButton = { TextButton({ if (stop) blockDialogs = true; close() }) { Text("Cancelar") } })
+            }
         }
     }
 
@@ -201,6 +248,24 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : P
 /** Permisos que piden las webs: ubicación, notificaciones, cámara y micrófono. */
 class Permissions(private val host: () -> PromptHost?) : PermissionDelegate {
 
+    /** «Solo esta vez»: se guarda el permiso concedido para retirarlo al salir de la web o cerrar la pestaña (#24). */
+    private fun rememberOnce(s: GeckoSession, p: ContentPermission) {
+        synchronized(temporary) { temporary += Triple(s, History.hostOf(p.uri), p) }
+    }
+
+    companion object {
+        private val temporary = mutableListOf<Triple<GeckoSession, String, ContentPermission>>()
+        /** La pestaña [s] se va a [newHost] (o se cierra, si es null): se retiran sus permisos temporales de otras webs. */
+        fun leaveSite(ctx: android.content.Context, s: GeckoSession, newHost: String?) {
+            val gone = synchronized(temporary) {
+                temporary.filter { it.first === s && it.second != newHost }.also { temporary.removeAll(it) }
+            }
+            if (gone.isEmpty()) return
+            val sc = Engine.get(ctx).storageController
+            gone.forEach { (_, _, p) -> runCatching { sc.setPermission(p, ContentPermission.VALUE_PROMPT) } }
+        }
+    }
+
     override fun onAndroidPermissionsRequest(s: GeckoSession, perms: Array<String>?, cb: PermissionDelegate.Callback) {
         val h = host()
         if (perms.isNullOrEmpty() || h == null) { cb.grant(); return }
@@ -214,14 +279,24 @@ class Permissions(private val host: () -> PromptHost?) : PermissionDelegate {
             PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> "guardar datos en el móvil"
             PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE -> return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
             PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE -> return GeckoResult.fromValue(ContentPermission.VALUE_ALLOW)
-            PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS -> return GeckoResult.fromValue(ContentPermission.VALUE_ALLOW) // vídeo con DRM
+            PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS -> return GeckoResult.fromValue(   // vídeo con DRM (#25)
+                if (Privacy.drm) ContentPermission.VALUE_ALLOW else ContentPermission.VALUE_DENY)
             else -> return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
         }
         val r = GeckoResult<Int>()
         val h = host() ?: return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
         var answered = false
         fun answer(v: Int) { if (!answered) { answered = true; r.complete(v) } }
-        h.show { close -> PermissionDialog(History.hostOf(p.uri), what, { answer(it); close() }, { answer(ContentPermission.VALUE_DENY); close() }) }
+        val notif = p.permission == PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION
+        h.show { close -> PermissionDialog(History.hostOf(p.uri), what,
+            answer = { v ->
+                answer(v); close()
+                // Para que las notificaciones de la web lleguen, Android también tiene que permitirlas (13+)
+                if (notif && v == ContentPermission.VALUE_ALLOW && android.os.Build.VERSION.SDK_INT >= 33)
+                    h.androidPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)) { }
+            },
+            once = if (notif) null else ({ answer(ContentPermission.VALUE_ALLOW); close(); rememberOnce(s, p) }),
+            dismiss = { answer(ContentPermission.VALUE_DENY); close() }) }
         return r
     }
 
@@ -236,16 +311,23 @@ class Permissions(private val host: () -> PromptHost?) : PermissionDelegate {
         val a = audio?.firstOrNull()
         var answered = false
         h.show { close -> PermissionDialog(History.hostOf(uri), "usar $what",
-            { ok -> if (!answered) { answered = true; if (ok == ContentPermission.VALUE_ALLOW) cb.grant(v, a) else cb.reject() }; close() },
-            { if (!answered) { answered = true; cb.reject() }; close() }) }
+            answer = { ok -> if (!answered) { answered = true; if (ok == ContentPermission.VALUE_ALLOW) cb.grant(v, a) else cb.reject() }; close() },
+            once = null,   // cámara y micrófono se piden cada vez: ya son «solo esta vez»
+            dismiss = { if (!answered) { answered = true; cb.reject() }; close() }) }
     }
 }
 
 @Composable
-private fun PermissionDialog(site: String, what: String, answer: (Int) -> Unit, dismiss: () -> Unit) {
+private fun PermissionDialog(site: String, what: String, answer: (Int) -> Unit, once: (() -> Unit)?, dismiss: () -> Unit) {
     AlertDialog(onDismissRequest = dismiss,
         icon = { SiteIcon(site, 40.dp) },
         title = { Text("¿Permitir que $site pueda $what?") },
-        confirmButton = { TextButton({ answer(ContentPermission.VALUE_ALLOW) }) { Text("Permitir") } },
-        dismissButton = { TextButton({ answer(ContentPermission.VALUE_DENY) }) { Text("No permitir") } })
+        text = { if (once != null) Text("«Solo esta vez» dura hasta que te vayas de esta web o cierres la pestaña.") },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                if (once != null) TextButton(once) { Text("Solo esta vez") }
+                TextButton({ answer(ContentPermission.VALUE_ALLOW) }) { Text("Permitir siempre") }
+                TextButton({ answer(ContentPermission.VALUE_DENY) }) { Text("No permitir") }
+            }
+        })
 }

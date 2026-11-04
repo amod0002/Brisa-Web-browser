@@ -42,6 +42,7 @@ object Engine {
     ).also { rt ->
         runtime = rt
         Passwords.init(ctx)
+        rt.setWebNotificationDelegate(WebNotifs(ctx.applicationContext))
         Report.load(ctx)
         rt.autocompleteStorageDelegate = Passwords
         Settings.load(ctx)
@@ -94,10 +95,8 @@ object Engine {
     fun withBuiltIn(cb: (WebExtension) -> Unit) { builtIn?.let(cb) ?: waiting.add(cb) }
 
     /** Borra cookies, caché y datos de todas las webs, y el historial. */
-    fun clearData(ctx: Context, done: () -> Unit) {
-        History.get(ctx).clear()
-        get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
-    }
+    /** Ajustes → «Borrar historial, cookies y caché»: la misma limpieza completa que «Borrar datos al salir». */
+    fun clearData(ctx: Context, done: () -> Unit) = Privacy.clearAll(ctx, done)
 
     /** Tamaño del texto de las webs (0,8 – 1,6), para todas las pestañas. */
     fun setTextSize(ctx: Context, f: Float) {
@@ -165,6 +164,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var blocked by mutableIntStateOf(0)
     var desktop by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
+    /** Ventanas de la web (alert, confirm…), con el bloqueo de diálogos en bucle (#21) por pestaña. */
+    private val prompts = Prompts(ctx, { tabHost as? PromptHost }) { url }
     var readerable by mutableStateOf(false)
     /** Permiso de rastreo de la web actual. ALLOW = protección desactivada en esta web. */
     var trackingPerm by mutableStateOf<GeckoSession.PermissionDelegate.ContentPermission?>(null)
@@ -185,7 +186,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
+            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs() }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
@@ -213,6 +214,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 if (Privacy.holdDuringInsecure(s, req.uri)) GeckoResult.fromValue(AllowOrDeny.DENY) else null
             // Gecko nos da el permiso de «rastreo» de cada web: sirve para el escudo por web.
             override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
+                // Permisos de «Solo esta vez»: se retiran al irse a otra web (#24)
+                Permissions.leaveSite(ctx, s, History.hostOf(u ?: ""))
                 trackingPerm = perms.firstOrNull { it.permission == GeckoSession.PermissionDelegate.PERMISSION_TRACKING }
             }
             // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
@@ -254,7 +257,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             desktop = true
             settings.userAgentMode = GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
         }
-        promptDelegate = Prompts(ctx) { tabHost as? PromptHost }
+        promptDelegate = prompts
         permissionDelegate = Permissions { tabHost as? PromptHost }
         if (openNow && !isOpen) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
@@ -292,7 +295,14 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     val isHome get() = url.isBlank() || url == "about:blank"
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
+    /** Lo que se escribe a mano en la barra: pasa por toUrl() (dirección, red local o búsqueda). */
     fun load(input: String) { pending = null; val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+
+    /**
+     * Direcciones que YA son direcciones (imágenes data:/blob:, favoritos, historial, páginas de extensiones):
+     * se abren tal cual y nunca se mandan al buscador. Gecko decide si se pueden mostrar.
+     */
+    fun open(address: String) { pending = null; session.loadUri(address); url = address }
 
     /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
     fun toggleReader() {
@@ -325,7 +335,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     private var lastFind = ""
     fun endFind() { session.finder.clear(); findText = null; findResult = ""; lastFind = "" }
 
-    fun close() = session.close()
+    fun close() { Permissions.leaveSite(ctx, session, null); session.close() }
 
     companion object {
         var tabHost: TabHost? = null

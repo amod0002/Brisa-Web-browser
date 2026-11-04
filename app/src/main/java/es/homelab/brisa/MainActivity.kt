@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     }
     override fun androidPermissions(perms: Array<String>, cb: (Boolean) -> Unit) {
         if (perms.all { checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { cb(true); return }
-        permsCb?.invoke(false); permsCb = cb; askPerms.launch(perms)
+        permsCb?.invoke(false); permsCb = cb; ownScreen = true; askPerms.launch(perms)
     }
 
     // Atajos de teclado: hay que verlos antes que la web (GeckoView tiene el foco). Uso deliberado.
@@ -147,12 +147,9 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
         current = tabs.lastIndex
-        // Pantalla a la máxima frecuencia (90/120 Hz) y una pestaña nueva ya preparada
-        if (android.os.Build.VERSION.SDK_INT >= 30) display?.let { d ->
-            val now = d.mode
-            d.supportedModes.filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
-                .maxByOrNull { it.refreshRate }?.let { m -> window.attributes = window.attributes.apply { preferredDisplayModeId = m.modeId } }
-        }
+        // La frecuencia de pantalla la decide Android (sube a 90/120 Hz al moverse y baja con la página quieta,
+        // que es como ahorra batería). Forzar el modo máximo lo impedía (#22).
+        // Pestaña nueva ya preparada:
         window.decorView.postDelayed({ Engine.warm(this) }, 2000)
         window.decorView.postDelayed({
             Engine.autoUblock(this) { ok ->
@@ -169,6 +166,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        intent.getStringExtra(WebNotifs.EXTRA_TAG)?.let { WebNotifs.clicked(it); return }
         intent.dataString?.let(::safeIncoming)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
     }
 
@@ -177,16 +175,34 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         super.onDestroy()
     }
 
+    // Pantallas que abre la propia Brisa (selector de archivos, permisos, compartir, huella, abrir una
+    // descarga…): al volver de ellas NO se bloquean las privadas, salvo que se tarde más de 2 minutos.
+    private var ownScreen = false
+    private var stoppedAt = 0L
+    override fun startActivity(intent: Intent?, options: Bundle?) { ownScreen = true; super.startActivity(intent, options) }
+    @Deprecated("Lo usan los ActivityResultLauncher") @Suppress("DEPRECATION")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        ownScreen = true; super.startActivityForResult(intent, requestCode, options)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000 && Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+        ownScreen = false
+    }
+
     override fun onStop() {
         super.onStop()
         Report.save()
+        stoppedAt = System.currentTimeMillis()
         // Al salir de la app, las pestañas privadas quedan bloqueadas hasta la huella/PIN
-        if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+        if (!ownScreen && Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
     }
 
     override fun onResume() {
         super.onResume()
-        tabs.getOrNull(current)?.session?.setActive(true)
+        // Una privada bloqueada sigue en pausa (sin audio ni vídeo) hasta desbloquearla
+        tabs.getOrNull(current)?.let { t -> if (!(t.private && ui.privateLocked)) t.session.setActive(true) }
     }
 
     override fun onPause() {
@@ -251,12 +267,19 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     LaunchedEffect(tab) {
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
         Tab.visible = tab
-        tab.session.setActive(true); tab.wake()
+        if (!(tab.private && ui.privateLocked)) { tab.session.setActive(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
         tabs.forEach { if (it !== tab) it.session.setActive(false) }
     }
     LaunchedEffect(tab.scrollDelta) {
         if (tab.scrollDelta > 8) collapsed = true else if (tab.scrollDelta < -8) collapsed = false
+    }
+
+    // Pestaña privada bloqueada: ni se ve el dominio, ni se navega, ni suena, hasta la huella/PIN
+    val locked = tab.private && ui.privateLocked
+    LaunchedEffect(locked) {
+        if (locked) { tab.session.setActive(false); editing = false; showMenu = false; tab.endFind() }
+        else { tab.session.setActive(true); tab.wake() }
     }
 
     fun newTab(private: Boolean = false) {
@@ -286,6 +309,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     SideEffect {
         ui.shortcut = { k ->
             when {
+                // Bloqueada: solo se permite cambiar de pestaña o abrir una nueva; lo demás pide desbloquear
+                locked && k !in setOf("nueva", "privada", "siguiente", "anterior") && !k.startsWith("pestaña:") -> ui.unlockPrivate(ctx)
                 k == "nueva" -> newTab()
                 k == "privada" -> newTab(private = true)
                 k == "cerrar" -> closeTab(current)
@@ -303,7 +328,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
     }
 
-    BackHandler(ui.fullScreen || showTabs || showMenu || editing || tab.findText != null || tab.canBack) {
+    BackHandler(ui.fullScreen || showTabs || showMenu || editing || tab.findText != null || (tab.canBack && !locked)) {
         when {
             ui.fullScreen -> tab.session.exitFullScreen()
             tab.findText != null -> tab.endFind()
@@ -317,7 +342,10 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().then(if (ui.fullScreen) Modifier else Modifier.statusBarsPadding())) {
-            if (wide && !ui.fullScreen) {
+            if (wide && !ui.fullScreen && locked) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.widthIn(max = 720.dp)) { LockedBar(tabs.size, onUnlock = { ui.unlockPrivate(ctx) }, onTabs = { showTabs = true }) }
+            }
+            else if (wide && !ui.fullScreen) {
                 TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
                     onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) },
                     onNewTab = { newTab(tab.private) }, ui = ui, onDownloads = { showDownloads = true })
@@ -330,7 +358,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                     // El contenedor de Compose no debe ocultar la web al autorrelleno de Android
                     (v.parent as? android.view.View)?.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
                 })
-                if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
+                if (tab.isHome) HomePage(favs, tab.private) { tab.open(it) }
                 if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
                 // Indicador de «estirar para recargar»: arriba del contenido (en tablet, debajo de la barra)
                 if (pull > 0f || refreshing) {
@@ -352,7 +380,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .navigationBarsPadding().imePadding().padding(horizontal = 12.dp).padding(bottom = 8.dp)
         ) {
-            AnimatedContent(collapsed && !editing && !tab.isHome && tab.findText == null, label = "bar") { small ->
+            if (locked) LockedBar(tabs.size, onUnlock = { ui.unlockPrivate(ctx) }, onTabs = { showTabs = true })
+            else AnimatedContent(collapsed && !editing && !tab.isHome && tab.findText == null, label = "bar") { small ->
                 if (small) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Row(Modifier.glass(RoundedCornerShape(50), tint = if (tab.private) PrivateGlass else null)
                         .clickable { collapsed = false }.padding(horizontal = 18.dp, vertical = 8.dp),
@@ -402,13 +431,17 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                 newTab = { u, priv ->
                     val nt = Tab(ctx, priv, u)
                     tabs.add(tabs.indexOf(t) + 1, nt)
-                    if (priv) select(tabs.indexOf(nt))
-                    android.widget.Toast.makeText(ctx, if (priv) "Abierta en pestaña privada" else "Abierta en una pestaña nueva", android.widget.Toast.LENGTH_SHORT).show()
+                    // Si cambia de modo (normal ↔ privada) se salta a ella; si no, se queda detrás como en Safari
+                    if (priv != t.private) select(tabs.indexOf(nt))
+                    android.widget.Toast.makeText(ctx, when {
+                        priv && t.private -> "Abierta en otra pestaña privada"
+                        priv -> "Abierta en pestaña privada"
+                        else -> "Abierta en una pestaña nueva" }, android.widget.Toast.LENGTH_SHORT).show()
                 },
-                open = { t.load(it) })
+                open = { t.open(it) }, fromPrivate = t.private)
         }
         if (showSettings) SettingsSheet { showSettings = false }
-        if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
+        if (showHistory) HistorySheet({ showHistory = false }) { tab.open(it) }
 
         DownloadFly(ui)
 

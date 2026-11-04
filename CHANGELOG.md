@@ -2,6 +2,18 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.6 · privadas a prueba, permisos y notificaciones (issues #20–#29, gracias @perritys)
+- **Privacidad** (#26): «Abrir imagen», favoritos e historial abren la dirección tal cual (`data:`, `blob:`, páginas de extensiones) y nunca la mandan al buscador.
+- **Privadas** (#29): desde una privada, «Abrir en pestaña nueva» abre otra privada; pasar a normal es una opción explícita.
+- **Privadas** (#27): bloqueadas de verdad: la barra no muestra el dominio y pide desbloquear, no se puede navegar ni usar «aA» o atajos, y no suena nada hasta la huella/PIN.
+- **Privadas** (#28): subir un archivo, dar un permiso o compartir no las bloquea al volver (salvo más de 2 minutos fuera).
+- **Borrar datos** (#20): también borra la caché de iconos, el informe de privacidad y la lista de descargas.
+- **Diálogos** (#21): cada `alert()` dice de qué web viene y, desde el segundo, casilla «Impedir que esta página cree más diálogos».
+- **Notificaciones de las webs** (#23): ahora llegan como notificaciones de Android (con Brisa abierta o en segundo plano).
+- **Permisos** (#24): «Solo esta vez», que se retira al salir de la web o cerrar la pestaña.
+- **Pantalla** (#22): ya no se fuerzan los 120 Hz; Android baja la frecuencia con la página quieta y ahorra batería.
+- **DRM** (#25): interruptor «Vídeo protegido (DRM)» en Ajustes (activado por defecto).
+
 ## 1.0.5 · gestos, uBlock e icono nuevo (issues #13, #14, #17, #18)
 - **Estirar para recargar** (#14): en lo alto de la página, tira hacia abajo. Solo si la web no ha usado el gesto (no salta en mapas, chats o carruseles). Se puede desactivar en Ajustes.
 - **uBlock Origin** (#18): sus ajustes, filtros y estadísticas se abren desde «aA» y desde el informe de privacidad. El informe explica que, con uBlock activo, es normal ver pocos bloqueos de Gecko.

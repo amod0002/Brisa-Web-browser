@@ -27,6 +27,12 @@ object WebIcons {
         return null
     }
 
+    /** Borra la caché de iconos (en disco y en memoria). */
+    fun clear(ctx: Context) {
+        map.clear()
+        File(ctx.cacheDir, "icons").deleteRecursively()
+    }
+
     /** Solo http(s), y una web de internet no puede hacer que Brisa pida algo a la red local. */
     fun allowed(pageHost: String, iconUrl: String): Boolean {
         if (!iconUrl.startsWith("https://") && !iconUrl.startsWith("http://")) return false

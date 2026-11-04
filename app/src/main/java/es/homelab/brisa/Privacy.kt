@@ -37,6 +37,8 @@ object Privacy {
     var clearOnExit by mutableStateOf(false); private set
     var lockPrivate by mutableStateOf(true); private set
     var askDownloads by mutableStateOf(true); private set
+    /** Vídeo protegido con DRM (Netflix, Prime…): permitido por defecto; se puede apagar por privacidad (#25). */
+    var drm by mutableStateOf(true); private set
 
 
     /** Parámetros de rastreo que se quitan de las direcciones. */
@@ -67,6 +69,7 @@ object Privacy {
         clearOnExit = prefs.getBoolean("borrar_salir", false)
         lockPrivate = prefs.getBoolean("bloquear_privadas", true)
         askDownloads = prefs.getBoolean("preguntar_descargas", true)
+        drm = prefs.getBoolean("drm", true)
     }
 
     /** Cambia un ajuste, lo guarda y lo aplica. */
@@ -84,6 +87,7 @@ object Privacy {
             "borrar_salir" -> clearOnExit = v as Boolean
             "bloquear_privadas" -> lockPrivate = v as Boolean
             "preguntar_descargas" -> askDownloads = v as Boolean
+            "drm" -> drm = v as Boolean
         }
         prefs.edit().apply {
             when (v) { is Int -> putInt(key, v); is Boolean -> putBoolean(key, v); is String -> putString(key, v) }
@@ -137,9 +141,18 @@ object Privacy {
     }
 
     // ---- Borrar al salir --------------------------------------------------------------------------
+    /**
+     * Borra todo rastro de navegación: historial, cookies, caché, datos de las webs, y también la caché de
+     * iconos (un archivo por web visitada), el informe de privacidad y la lista de descargas (#20).
+     * Los archivos descargados en Descargas/Brisa no se tocan: son tuyos.
+     */
     fun clearAll(ctx: Context, done: () -> Unit = {}) {
+        val rt = Engine.get(ctx)
         History.get(ctx).clear()
-        Engine.get(ctx).storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
+        WebIcons.clear(ctx)
+        Report.clear()
+        Downloads.load(ctx); Downloads.clear(ctx)
+        rt.storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
     }
 
     /** Un DNS propio tiene que ser DNS sobre HTTPS: https://servidor/ruta (sin espacios). */

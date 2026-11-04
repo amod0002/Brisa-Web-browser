@@ -149,7 +149,7 @@ fun HistorySheet(dismiss: () -> Unit, open: (String) -> Unit) {
 /** Mantener pulsado un enlace o una imagen. */
 @Composable
 fun LinkSheet(e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement, dismiss: () -> Unit,
-              newTab: (String, Boolean) -> Unit, open: (String) -> Unit) {
+              newTab: (String, Boolean) -> Unit, open: (String) -> Unit, fromPrivate: Boolean = false) {
     val ctx = LocalContext.current
     val link = e.linkUri
     val src = e.srcUri
@@ -170,10 +170,20 @@ fun LinkSheet(e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextEleme
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             if (link != null) {
-                ListItem(leadingContent = { Icon(Icons.Outlined.Tab, null) }, headlineContent = { Text("Abrir en pestaña nueva") },
-                    modifier = Modifier.clickable { newTab(link, false); dismiss() })
-                ListItem(leadingContent = { Icon(Icons.Outlined.VisibilityOff, null) }, headlineContent = { Text("Abrir en pestaña privada") },
-                    modifier = Modifier.clickable { newTab(link, true); dismiss() })
+                if (fromPrivate) {
+                    // Desde una privada, lo normal es seguir en privado; salir de él tiene que ser explícito
+                    ListItem(leadingContent = { Icon(Icons.Outlined.VisibilityOff, null) }, headlineContent = { Text("Abrir en pestaña nueva") },
+                        supportingContent = { Text("Privada") },
+                        modifier = Modifier.clickable { newTab(link, true); dismiss() })
+                    ListItem(leadingContent = { Icon(Icons.Outlined.Tab, null) }, headlineContent = { Text("Abrir en pestaña normal") },
+                        supportingContent = { Text("Sale del modo privado: quedará en el historial") },
+                        modifier = Modifier.clickable { newTab(link, false); dismiss() })
+                } else {
+                    ListItem(leadingContent = { Icon(Icons.Outlined.Tab, null) }, headlineContent = { Text("Abrir en pestaña nueva") },
+                        modifier = Modifier.clickable { newTab(link, false); dismiss() })
+                    ListItem(leadingContent = { Icon(Icons.Outlined.VisibilityOff, null) }, headlineContent = { Text("Abrir en pestaña privada") },
+                        modifier = Modifier.clickable { newTab(link, true); dismiss() })
+                }
                 ListItem(leadingContent = { Icon(Icons.Outlined.ContentCopy, null) }, headlineContent = { Text("Copiar enlace") },
                     modifier = Modifier.clickable { copy(link); dismiss() })
                 ListItem(leadingContent = { Icon(Icons.Outlined.Share, null) }, headlineContent = { Text("Compartir enlace") },
