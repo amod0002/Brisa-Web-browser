@@ -218,14 +218,27 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Icono nuevo (brújula de viento) en el lanzador: ocupa la forma del lanzador, sin borde blanco.
 - [ ] Con «Iconos temáticos» activados (Fondo de pantalla y estilo), el icono coge los colores del sistema.
 
-## 24. Android
+## 24. Novedades 1.0.6 · issues #20–#29
+- [ ] Mantener pulsada una imagen pequeña que cargue poco a poco (data:) → «Abrir imagen»: se ve la imagen, no una búsqueda.
+- [ ] Guardar el panel de uBlock como favorito y abrirlo desde Inicio.
+- [ ] En una privada, mantener pulsado un enlace → «Abrir en pestaña nueva» abre otra privada; «Abrir en pestaña normal» abre una normal.
+- [ ] Privada con un vídeo sonando → salir a inicio → volver: no suena, la barra dice «Pestaña privada bloqueada» sin dominio; no se puede escribir en ella; el botón de pestañas sí funciona.
+- [ ] En una privada, subir una foto a una web: al volver no pide huella y la foto se adjunta.
+- [ ] «Borrar datos al salir» activado: al volver, no hay iconos de webs visitadas, el informe está a cero y la lista de descargas vacía.
+- [ ] Una web con `alert()` en bucle: al segundo aviso sale la casilla «Impedir…»; marcándola se acaba. El título dice «<web> dice:».
+- [ ] Dar permiso de notificaciones a una web de pruebas (p. ej. «web push test») y mandar una: llega a Android; tocarla abre la web.
+- [ ] Ubicación en Google Maps → «Solo esta vez»: funciona; al irte a otra web y volver, vuelve a preguntar.
+- [ ] Opciones de desarrollador → «Mostrar frecuencia de actualización»: con la página quieta baja de 120.
+- [ ] Ajustes → «Vídeo protegido (DRM)» apagado: Netflix/Prime no reproducen; encendido sí.
+
+## 25. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 25. Velocidad (comparar con Chrome)
+## 26. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
 
