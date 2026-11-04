@@ -365,7 +365,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
 
         var showHistory by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
-        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true })
+        if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true },
+            openTab = { u -> tabs.add(current + 1, Tab(ctx, tab.private, u)); select(current + 1) })
         if (showDownloads) DownloadsSheet { showDownloads = false }
         ui.dialogs.toList().forEach { d -> key(d) { d { ui.dialogs.remove(d) } } }
         ui.context?.let { (t, e) ->
