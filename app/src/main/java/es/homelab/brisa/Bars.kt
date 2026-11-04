@@ -85,7 +85,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
         // Una palabra suelta (proxmox, nas…) se busca, pero se ofrece ir a esa máquina de la red
         val bareHost = text.trim().takeIf { it.matches(Regex("^[a-zA-Z0-9-]{2,}$")) }
         if (hist.isNotEmpty() || remote.isNotEmpty() || bareHost != null || (current != null && text.isEmpty())) Column(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp))) {
-            if (bareHost != null) Row(Modifier.fillMaxWidth().clickable { tab.load("http://$bareHost/"); setEditing(false) }.padding(horizontal = 14.dp, vertical = 11.dp),
+            if (bareHost != null) Row(Modifier.fillMaxWidth().clickable { tab.open("http://$bareHost/"); setEditing(false) }.padding(horizontal = 14.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Lan, null, Modifier.size(20.dp), tint = glassContentDim()) }
                 Text("Ir a http://$bareHost/", Modifier.weight(1f).padding(start = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, color = glassContent())
@@ -100,7 +100,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
                 Icon(Icons.Outlined.Edit, "Editar dirección", Modifier.size(20.dp), tint = glassContentDim())
             }
             hist.forEach { e ->
-                Row(Modifier.fillMaxWidth().clickable { tab.load(e.url); setEditing(false) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                Row(Modifier.fillMaxWidth().clickable { tab.open(e.url); setEditing(false) }.padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     SiteIcon(History.hostOf(e.url), 28.dp, 6.dp)
                     Column(Modifier.padding(start = 12.dp)) {

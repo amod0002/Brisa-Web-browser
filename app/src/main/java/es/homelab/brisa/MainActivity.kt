@@ -330,7 +330,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                     // El contenedor de Compose no debe ocultar la web al autorrelleno de Android
                     (v.parent as? android.view.View)?.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
                 })
-                if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
+                if (tab.isHome) HomePage(favs, tab.private) { tab.open(it) }
                 if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
                 // Indicador de «estirar para recargar»: arriba del contenido (en tablet, debajo de la barra)
                 if (pull > 0f || refreshing) {
@@ -405,10 +405,10 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                     if (priv) select(tabs.indexOf(nt))
                     android.widget.Toast.makeText(ctx, if (priv) "Abierta en pestaña privada" else "Abierta en una pestaña nueva", android.widget.Toast.LENGTH_SHORT).show()
                 },
-                open = { t.load(it) })
+                open = { t.open(it) })
         }
         if (showSettings) SettingsSheet { showSettings = false }
-        if (showHistory) HistorySheet({ showHistory = false }) { tab.load(it) }
+        if (showHistory) HistorySheet({ showHistory = false }) { tab.open(it) }
 
         DownloadFly(ui)
 

@@ -292,7 +292,14 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     val isHome get() = url.isBlank() || url == "about:blank"
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
+    /** Lo que se escribe a mano en la barra: pasa por toUrl() (dirección, red local o búsqueda). */
     fun load(input: String) { pending = null; val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+
+    /**
+     * Direcciones que YA son direcciones (imágenes data:/blob:, favoritos, historial, páginas de extensiones):
+     * se abren tal cual y nunca se mandan al buscador. Gecko decide si se pueden mostrar.
+     */
+    fun open(address: String) { pending = null; session.loadUri(address); url = address }
 
     /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
     fun toggleReader() {
