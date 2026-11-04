@@ -2,6 +2,9 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.4 · Gecko 159
+- Motor GeckoView 159.0.20261102144711, con los últimos parches de seguridad de Mozilla.
+
 ## 1.0.3 · revisión de la comunidad (issues #3–#11, gracias @perritys)
 - **Contraseñas** (#3): si no se pueden leer, el archivo se aparta (`contrasenas.bin.roto-<fecha>`) y se avisa en Ajustes; nunca se sobrescribe. Copia `.bak` antes de cada guardado.
 - **Contraseñas** (#8): se emparejan por origen (esquema, servidor y puerto); una de `https` nunca se ofrece en `http` (salvo red local). Arreglado el relleno en webs con puerto (`192.168.1.50:8006`).

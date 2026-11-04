@@ -217,3 +217,12 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 ## 24. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
+
+## 25. Repaso rápido 1.0.4 · Gecko 159.0.20261102144711
+- [ ] Instalar encima de la 1.0.3: se conservan pestañas, marcadores, historial y contraseñas.
+- [ ] uBlock Origin sigue activo (sin anuncios en una web con publicidad).
+- [ ] YouTube: un vídeo se reproduce y se puede poner a pantalla completa.
+- [ ] Google Maps carga, se mueve y pide/usa la ubicación.
+- [ ] Login de un servicio del homelab (p. ej. Proxmox): rellena y entra.
+- [ ] Una descarga termina y se abre desde la lista.
+- [ ] Modo lectura en un artículo de noticias.
