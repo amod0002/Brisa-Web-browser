@@ -42,6 +42,7 @@ object Engine {
     ).also { rt ->
         runtime = rt
         Passwords.init(ctx)
+        rt.setWebNotificationDelegate(WebNotifs(ctx.applicationContext))
         Report.load(ctx)
         rt.autocompleteStorageDelegate = Passwords
         Settings.load(ctx)
@@ -213,6 +214,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 if (Privacy.holdDuringInsecure(s, req.uri)) GeckoResult.fromValue(AllowOrDeny.DENY) else null
             // Gecko nos da el permiso de «rastreo» de cada web: sirve para el escudo por web.
             override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
+                // Permisos de «Solo esta vez»: se retiran al irse a otra web (#24)
+                Permissions.leaveSite(ctx, s, History.hostOf(u ?: ""))
                 trackingPerm = perms.firstOrNull { it.permission == GeckoSession.PermissionDelegate.PERMISSION_TRACKING }
             }
             // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
@@ -332,7 +335,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     private var lastFind = ""
     fun endFind() { session.finder.clear(); findText = null; findResult = ""; lastFind = "" }
 
-    fun close() = session.close()
+    fun close() { Permissions.leaveSite(ctx, session, null); session.close() }
 
     companion object {
         var tabHost: TabHost? = null

@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        intent.getStringExtra(WebNotifs.EXTRA_TAG)?.let { WebNotifs.clicked(it); return }
         intent.dataString?.let(::safeIncoming)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
     }
 
