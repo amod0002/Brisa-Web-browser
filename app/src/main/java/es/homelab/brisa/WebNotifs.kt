@@ -19,14 +19,19 @@ class WebNotifs(private val ctx: Context) : WebNotificationDelegate {
     override fun onShowNotification(n: WebNotification) {
         live[n.tag] = n
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, "Notificaciones de las webs", NotificationManager.IMPORTANCE_DEFAULT))
+        // Las que la web marca como silenciosas van a un canal que no suena ni vibra
+        val channel = if (n.silent) CHANNEL_SILENT else CHANNEL
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Notificaciones de las webs", NotificationManager.IMPORTANCE_DEFAULT))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL_SILENT, "Notificaciones de las webs (silenciosas)", NotificationManager.IMPORTANCE_LOW))
+        }
         val open = PendingIntent.getActivity(ctx, n.tag.hashCode(),
             Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_TAG, n.tag),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val gone = PendingIntent.getBroadcast(ctx, n.tag.hashCode(),
             Intent(ctx, Dismissed::class.java).putExtra(EXTRA_TAG, n.tag), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         @Suppress("DEPRECATION")
-        val b = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(ctx, CHANNEL) else android.app.Notification.Builder(ctx)
+        val b = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(ctx, channel) else android.app.Notification.Builder(ctx)
         val site = History.hostOf(n.source ?: "")
         b.setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(n.title ?: site)
@@ -36,7 +41,6 @@ class WebNotifs(private val ctx: Context) : WebNotificationDelegate {
             .setContentIntent(open)
             .setDeleteIntent(gone)
             .setStyle(android.app.Notification.BigTextStyle().bigText(n.text ?: ""))
-        if (n.silent) b.setSilent(true)
         runCatching { nm.notify(n.tag.hashCode(), b.build()) }
     }
 
@@ -52,6 +56,7 @@ class WebNotifs(private val ctx: Context) : WebNotificationDelegate {
 
     companion object {
         const val CHANNEL = "webs"
+        const val CHANNEL_SILENT = "webs_silencio"
         const val EXTRA_TAG = "brisa.notificacion"
         private val live = java.util.concurrent.ConcurrentHashMap<String, WebNotification>()
         /** Se tocó la notificación: la web decide qué abrir (normalmente su propia página). */
