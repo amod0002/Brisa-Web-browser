@@ -38,7 +38,34 @@ interface PromptHost {
  * Ventanas que piden las webs: alert/confirm/prompt, desplegables, usuario y contraseña (HTTP),
  * subir archivos, fecha y hora.
  */
-class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : PromptDelegate {
+class Prompts(private val ctx: Context, private val host: () -> PromptHost?, private val pageUrl: () -> String = { "" }) : PromptDelegate {
+
+    // ---- #21: una web no puede encerrarte a base de alert() -----------------------------------------
+    private var blockDialogs = false
+    private var dialogCount = 0
+    private var firstDialogAt = 0L
+    /** Al cargar otra página se vuelven a permitir los diálogos. */
+    fun resetDialogs() { blockDialogs = false; dialogCount = 0 }
+    /** Cuenta el diálogo; devuelve true si ya toca ofrecer «Impedir más diálogos» (2.º en 30 s). */
+    private fun countDialog(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - firstDialogAt > 30_000) { dialogCount = 0; firstDialogAt = now }
+        dialogCount++
+        return dialogCount >= 2
+    }
+    /** Quién habla: el dominio de la página, para que un aviso de una pestaña de fondo no parezca de la visible. */
+    private fun site() = History.hostOf(pageUrl()).ifBlank { "Esta página" }
+
+    @Composable
+    private fun Body(message: String?, offerBlock: Boolean, stop: Boolean, onStop: (Boolean) -> Unit, extra: @Composable () -> Unit = {}) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text(message ?: "")
+            extra()
+            if (offerBlock) Row(Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onStop(!stop) }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(stop, onStop); Text("Impedir que esta página cree más diálogos", Modifier.padding(start = 4.dp))
+            }
+        }
+    }
 
     private fun <T : BasePrompt> ask(p: T, d: (T, (PromptResponse) -> Unit) -> Dialog): GeckoResult<PromptResponse> {
         val r = GeckoResult<PromptResponse>()
@@ -50,29 +77,49 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?) : P
         return r
     }
 
-    override fun onAlertPrompt(s: GeckoSession, p: AlertPrompt) = ask(p) { pr, done ->
-        { close -> AlertDialog(onDismissRequest = { close() },
-            title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-            text = { Text(pr.message ?: "") },
-            confirmButton = { TextButton({ done(pr.dismiss()); close() }) { Text("Aceptar") } }) }
+    override fun onAlertPrompt(s: GeckoSession, p: AlertPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.dismiss())
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.dismiss()); close() }) { Text("Aceptar") } })
+            }
+        }
     }
 
-    override fun onButtonPrompt(s: GeckoSession, p: ButtonPrompt) = ask(p) { pr, done ->
-        { close -> AlertDialog(onDismissRequest = { close() },
-            title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-            text = { Text(pr.message ?: "") },
-            confirmButton = { TextButton({ done(pr.confirm(ButtonPrompt.Type.POSITIVE)); close() }) { Text("Aceptar") } },
-            dismissButton = { TextButton({ done(pr.confirm(ButtonPrompt.Type.NEGATIVE)); close() }) { Text("Cancelar") } }) }
+    override fun onButtonPrompt(s: GeckoSession, p: ButtonPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.confirm(ButtonPrompt.Type.NEGATIVE))
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(ButtonPrompt.Type.POSITIVE)); close() }) { Text("Aceptar") } },
+                    dismissButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(ButtonPrompt.Type.NEGATIVE)); close() }) { Text("Cancelar") } })
+            }
+        }
     }
 
-    override fun onTextPrompt(s: GeckoSession, p: TextPrompt) = ask(p) { pr, done ->
-        { close ->
-            var v by remember { mutableStateOf(pr.defaultValue ?: "") }
-            AlertDialog(onDismissRequest = { close() },
-                title = pr.title?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-                text = { Column { Text(pr.message ?: ""); OutlinedTextField(v, { v = it }, Modifier.padding(top = 12.dp), singleLine = true) } },
-                confirmButton = { TextButton({ done(pr.confirm(v)); close() }) { Text("Aceptar") } },
-                dismissButton = { TextButton({ close() }) { Text("Cancelar") } })
+    override fun onTextPrompt(s: GeckoSession, p: TextPrompt): GeckoResult<PromptResponse> {
+        if (blockDialogs) return GeckoResult.fromValue(p.dismiss())
+        val offer = countDialog(); val who = site()
+        return ask(p) { pr, done ->
+            { close ->
+                var v by remember { mutableStateOf(pr.defaultValue ?: "") }
+                var stop by remember { mutableStateOf(false) }
+                AlertDialog(onDismissRequest = { if (stop) blockDialogs = true; close() },
+                    title = { Text("$who dice:") },
+                    text = { Body(pr.message, offer, stop, { stop = it }) {
+                        OutlinedTextField(v, { v = it }, Modifier.padding(top = 12.dp), singleLine = true) } },
+                    confirmButton = { TextButton({ if (stop) blockDialogs = true; done(pr.confirm(v)); close() }) { Text("Aceptar") } },
+                    dismissButton = { TextButton({ if (stop) blockDialogs = true; close() }) { Text("Cancelar") } })
+            }
         }
     }
 

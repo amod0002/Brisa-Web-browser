@@ -163,6 +163,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var blocked by mutableIntStateOf(0)
     var desktop by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
+    /** Ventanas de la web (alert, confirm…), con el bloqueo de diálogos en bucle (#21) por pestaña. */
+    private val prompts = Prompts(ctx, { tabHost as? PromptHost }) { url }
     var readerable by mutableStateOf(false)
     /** Permiso de rastreo de la web actual. ALLOW = protección desactivada en esta web. */
     var trackingPerm by mutableStateOf<GeckoSession.PermissionDelegate.ContentPermission?>(null)
@@ -183,7 +185,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false }
+            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs() }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
@@ -252,7 +254,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             desktop = true
             settings.userAgentMode = GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
         }
-        promptDelegate = Prompts(ctx) { tabHost as? PromptHost }
+        promptDelegate = prompts
         permissionDelegate = Permissions { tabHost as? PromptHost }
         if (openNow && !isOpen) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
