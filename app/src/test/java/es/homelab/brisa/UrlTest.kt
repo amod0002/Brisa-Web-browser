@@ -158,3 +158,18 @@ class PasswordMatchTest {
         assertEquals(0, Passwords.match(all, "evil.a.com", "https://evil.a.com/").size)
     }
 }
+
+class EsquemasBarraTest {
+    @Test fun fileSeBusca() = org.junit.Assert.assertTrue(Tab.toUrl("file:///etc/hosts").startsWith("https://duckduckgo.com/?q="))
+    @Test fun intentSeBusca() = org.junit.Assert.assertTrue(Tab.toUrl("intent://x#Intent;end").startsWith("https://duckduckgo.com/?q="))
+    @Test fun aboutBlank() = assertEquals("about:blank", Tab.toUrl("about:blank"))
+    @Test fun httpsSigue() = assertEquals("https://elpais.com/", Tab.toUrl("https://elpais.com/"))
+}
+
+class PasswordFondoTest {
+    private fun l(origin: String) = Passwords.Login("g-$origin", origin, null, null, "yo", "x", 0, 0)
+    @Test fun sinPaginaNoSeOfrecenLasHttps() {
+        assertEquals(0, Passwords.match(listOf(l("https://a.com")), "a.com", null).size)
+        assertEquals(1, Passwords.match(listOf(l("http://192.168.1.50:8006")), "192.168.1.50", null).size)
+    }
+}

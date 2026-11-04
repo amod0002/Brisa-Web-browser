@@ -1,5 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
-  <path fill="#1E88E5" d="M54,8a46,46 0,1 0,0.01 0z"/>
-  <path fill="#FFFFFF" d="M30,46h40a8,8 0,1 0,-8,-8h-6a14,14 0,1 1,14 14H30z"/>
-  <path fill="#FFFFFF" d="M30,60h48a8,8 0,1 1,-8,8h-6a14,14 0,1 0,14 -14H30z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <title>Brisa</title>
+  <rect width="108" height="108" rx="26" fill="#0C447C"/>
+  <g transform="translate(54 54) scale(0.88) translate(-54 -54)">
+    <circle cx="54" cy="54" r="34" fill="none" stroke="#85B7EB" stroke-width="3"/>
+    <path d="M54 20 L62 54 L54 88 L46 54Z" fill="#E6F1FB"/>
+    <path d="M54 20 L62 54 L46 54Z" fill="#378ADD"/>
+    <path d="M24 46 q14 -8 26 0" fill="none" stroke="#E6F1FB" stroke-width="4" stroke-linecap="round"/>
+    <path d="M58 62 q14 8 26 0" fill="none" stroke="#E6F1FB" stroke-width="4" stroke-linecap="round"/>
+  </g>
 </svg>

@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -53,7 +54,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.GeckoView
 
 @Composable
-fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit, openSettings: () -> Unit, openDownloads: () -> Unit) {
+fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory: () -> Unit, openSettings: () -> Unit, openDownloads: () -> Unit,
+             openTab: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     var size by remember { mutableFloatStateOf(Engine.textSize(ctx)) }
     var ublock by remember { mutableStateOf<Boolean?>(null) }
@@ -66,7 +68,7 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
                 supportingContent = { Text("Ver informe de privacidad") },
                 trailingContent = { if (!tab.isHome && !tab.private && tab.trackingPerm != null) Switch(!tab.shieldOff, { tab.toggleShield(); dismiss() }) },
                 modifier = Modifier.clickable { showReport = true })
-            if (showReport) ReportSheet { showReport = false }
+            if (showReport) ReportSheet({ showReport = false }) { u -> showReport = false; dismiss(); openTab(u) }
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Tamaño del texto", Modifier.weight(1f))
                 OutlinedButton({ size = (size - 0.1f).coerceAtLeast(0.8f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 13.sp) }
@@ -88,8 +90,16 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
                 modifier = Modifier.clickable { dismiss(); openDownloads() })
             ListItem(leadingContent = { Icon(Icons.Outlined.Extension, null) },
                 headlineContent = { Text(when (ublock) { true -> "uBlock Origin activo"; null -> "Extensiones…"; else -> "Instalar uBlock Origin" }) },
-                supportingContent = { Text("Bloqueador de anuncios") },
-                modifier = Modifier.clickable(enabled = ublock == false) {
+                supportingContent = { Text(if (ublock == true) "Ajustes, filtros y estadísticas" else "Bloqueador de anuncios") },
+                trailingContent = { if (ublock == true) Icon(Icons.AutoMirrored.Filled.OpenInNew, null, Modifier.size(18.dp)) },
+                modifier = Modifier.clickable(enabled = ublock != null) {
+                    if (ublock == true) {
+                        Engine.ublockOptions(ctx) { u ->
+                            if (u != null) { dismiss(); openTab(u) }
+                            else android.widget.Toast.makeText(ctx, "No se pudo abrir uBlock Origin", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        return@clickable
+                    }
                     ublock = null
                     android.widget.Toast.makeText(ctx, "Instalando uBlock Origin…", android.widget.Toast.LENGTH_SHORT).show()
                     Engine.installUblock(ctx) { ok ->
@@ -218,7 +228,8 @@ fun DownloadsSheet(dismiss: () -> Unit) {
 
 /** Informe de privacidad de los últimos 7 días. */
 @Composable
-fun ReportSheet(dismiss: () -> Unit) {
+fun ReportSheet(dismiss: () -> Unit, openTab: (String) -> Unit = {}) {
+    val ctx = LocalContext.current
     @Suppress("UNUSED_VARIABLE") val v = Report.version   // repintar con datos nuevos
     val days = Report.perDay(7)
     val max = (days.maxOfOrNull { it.second } ?: 0).coerceAtLeast(1)
@@ -228,7 +239,7 @@ fun ReportSheet(dismiss: () -> Unit) {
             Text("Informe de privacidad", style = MaterialTheme.typography.titleLarge)
             Text("Últimos 7 días · solo en este móvil", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("${Report.total(7)}", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
-            Text("rastreadores bloqueados por Brisa", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("bloqueados por la protección de Gecko", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth().height(120.dp).padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 days.forEach { (d, n) ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -249,8 +260,12 @@ fun ReportSheet(dismiss: () -> Unit) {
                     }
                 }
             } else Text("Aún no hay datos. Navega un poco y vuelve.", Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Cuenta lo que bloquea la protección de Gecko; uBlock Origin bloquea además los anuncios por su cuenta.",
+            // #18: con uBlock activo es normal ver pocos o ningún bloqueo aquí, porque uBlock corta antes
+            Text("Aquí solo se cuenta lo que bloquea la protección de Gecko. uBlock Origin actúa antes y bloquea casi todo por su cuenta, así que con él activo es normal ver pocos bloqueos (o ninguno). Sus cifras están en sus estadísticas.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+            OutlinedButton({ Engine.ublockOptions(ctx) { u -> if (u != null) openTab(u) } }, Modifier.padding(top = 8.dp)) {
+                Text("Estadísticas y filtros de uBlock Origin")
+            }
             TextButton({ Report.clear() }, Modifier.padding(top = 4.dp)) { Text("Borrar informe") }
         }
     }

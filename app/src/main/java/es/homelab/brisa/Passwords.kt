@@ -123,7 +123,8 @@ object Passwords : Autocomplete.StorageDelegate {
             .put("created", it.created).put("used", it.lastUsed)) }
         val tmp = File(file.path + ".tmp")
         tmp.writeBytes(encrypt(a.toString().toByteArray(Charsets.UTF_8)))
-        // Copia de la versión anterior antes de sustituirla
+        // Copia de la versión anterior antes de sustituirla. Protege de un archivo dañado a medio guardar,
+        // NO de perder la clave del Keystore (está cifrada con la misma clave): no es una copia de seguridad.
         if (file.exists()) runCatching { file.copyTo(File(file.path + ".bak"), overwrite = true) }
         if (!tmp.renameTo(file)) { tmp.copyTo(file, overwrite = true); tmp.delete() }
     }
@@ -167,9 +168,11 @@ object Passwords : Autocomplete.StorageDelegate {
         val page = pageUrl?.takeIf { hostOnly(it) == h }
         return all.filter { l ->
             if (hostOnly(l.origin) != h) return@filter false
-            if (page == null) return@filter true
-            if (port(l.origin) != port(page)) return@filter false
             val savedHttps = l.origin.startsWith("https://", true)
+            // No sabemos de qué página viene la petición (pestaña de fondo): no se ofrecen las de https,
+            // porque no consta que la página lo sea. En la red local, sí.
+            if (page == null) return@filter !savedHttps || Privacy.isLocal(h)
+            if (port(l.origin) != port(page)) return@filter false
             val pageHttp = page.startsWith("http://", true)
             !(savedHttps && pageHttp && !Privacy.isLocal(h))
         }

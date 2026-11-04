@@ -123,6 +123,14 @@ object Engine {
         }
     }
 
+    /** Página de ajustes y filtros de uBlock Origin (moz-extension://…/dashboard.html), si está instalado. */
+    fun ublockOptions(ctx: Context, cb: (String?) -> Unit) {
+        get(ctx).webExtensionController.list().accept({ l ->
+            val u = l?.firstOrNull { it.id == UBLOCK_ID }
+            cb(u?.metaData?.optionsPageUrl ?: u?.metaData?.baseUrl?.let { it.trimEnd('/') + "/dashboard.html" })
+        }, { cb(null) })
+    }
+
     fun installUblock(ctx: Context, done: (Boolean) -> Unit) {
         get(ctx).webExtensionController.install(UBLOCK).accept({ done(true) }, { done(false) })
     }
@@ -330,7 +338,11 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             val t = s.trim()
             val host = t.substringBefore('/').substringBefore(':').lowercase()
             return when {
-                t.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) -> t
+                // Solo se abren webs y páginas internas de Gecko; file://, content://, intent://… se buscan
+                t.matches(Regex("^(https?)://.*", RegexOption.IGNORE_CASE)) -> t
+                t.matches(Regex("^about:(blank|reader|logins|support)$", RegexOption.IGNORE_CASE)) -> t.lowercase()
+                t.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:.*")) && !t.matches(Regex("^[a-zA-Z0-9-]+:\\d+(/.*)?$")) &&
+                    !t.startsWith("localhost:", true) -> search.replace("%s", java.net.URLEncoder.encode(t, "UTF-8"))
                 // IPv6 entre corchetes: [fd00::1]:8080
                 t.matches(Regex("^\\[[0-9a-fA-F:.]+](:\\d+)?(/.*)?$")) -> "http://$t"
                 // IPv4
