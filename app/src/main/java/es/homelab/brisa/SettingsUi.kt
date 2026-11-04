@@ -79,6 +79,13 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 }
                 Switch(Settings.suggest, { Settings.setSuggest(ctx, it) })
             }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Estirar hacia abajo para recargar")
+                    Text("En lo alto de la página, tira hacia abajo", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(Settings.pullRefresh, { Settings.changePullRefresh(ctx, it) })
+            }
             if (Settings.isTablet) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Webs de escritorio en la tablet")

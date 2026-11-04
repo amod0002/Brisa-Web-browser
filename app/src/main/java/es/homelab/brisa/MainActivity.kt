@@ -224,13 +224,29 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     var editing by remember { mutableStateOf(false) }
     var collapsed by remember { mutableStateOf(false) }
     val geckoView = remember {
-        GeckoView(ctx).apply {
+        PullGeckoView(ctx).apply {
             // Autorrelleno de Android (Bitwarden, 1Password, KeePassDX…): Gecko describe los campos de la web a Android
             setAutofillEnabled(true)
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
         }
     }
     val favs = remember { Favorites(ctx) }
+    // Estirar para recargar
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var pull by remember { mutableFloatStateOf(0f) }
+    var refreshing by remember { mutableStateOf(false) }
+    val threshold = with(density) { 96.dp.toPx() }
+    SideEffect {
+        geckoView.pullEnabled = Settings.pullRefresh && !tab.isHome && !ui.fullScreen
+        geckoView.onPull = { pull = it }
+        geckoView.onRelease = { d ->
+            pull = 0f
+            if (d >= threshold && !tab.isHome) { refreshing = true; tab.session.reload() }
+        }
+    }
+    LaunchedEffect(refreshing, tab.progress) {
+        if (refreshing && tab.progress == 100) { kotlinx.coroutines.delay(250); refreshing = false }
+    }
 
     LaunchedEffect(tab) {
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
@@ -316,6 +332,18 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                 })
                 if (tab.isHome) HomePage(favs, tab.private) { tab.load(it) }
                 if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
+                // Indicador de «estirar para recargar»: arriba del contenido (en tablet, debajo de la barra)
+                if (pull > 0f || refreshing) {
+                    val frac = (pull / threshold).coerceIn(0f, 1f)
+                    val y = with(density) { if (refreshing) 24.dp.toPx() else (pull * 0.45f).coerceAtMost(80.dp.toPx()) }
+                    Box(Modifier.align(Alignment.TopCenter).offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }
+                        .size(40.dp).glass(CircleShape), contentAlignment = Alignment.Center) {
+                        if (refreshing) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                        else Icon(Icons.Filled.Refresh, "Recargar", Modifier.size(22.dp).graphicsLayer {
+                            rotationZ = frac * 270f; alpha = 0.4f + 0.6f * frac },
+                            tint = if (frac >= 1f) MaterialTheme.colorScheme.primary else glassContent())
+                    }
+                }
             }
         }
 

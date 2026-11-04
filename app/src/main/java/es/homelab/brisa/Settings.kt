@@ -28,8 +28,14 @@ object Settings {
         private set
     fun changeDesktopTablet(ctx: Context, v: Boolean) { desktopTablet = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("escritorio_tablet", v).apply() }
 
+    /** Estirar hacia abajo para recargar (se puede desactivar). */
+    var pullRefresh by mutableStateOf(true)
+        private set
+    fun changePullRefresh(ctx: Context, v: Boolean) { pullRefresh = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("estirar_recargar", v).apply() }
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences("ajustes", 0)
+        pullRefresh = p.getBoolean("estirar_recargar", true)
         isTablet = ctx.resources.configuration.smallestScreenWidthDp >= 600
         desktopTablet = p.getBoolean("escritorio_tablet", true)
         search = p.getString("buscador", search)!!; suggest = p.getBoolean("sugerencias", true)

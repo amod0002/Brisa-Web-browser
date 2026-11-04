@@ -2,6 +2,11 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.5 · gestos y uBlock (issues #13, #14, #18)
+- **Estirar para recargar** (#14): en lo alto de la página, tira hacia abajo. Solo si la web no ha usado el gesto (no salta en mapas, chats o carruseles). Se puede desactivar en Ajustes.
+- **uBlock Origin** (#18): sus ajustes, filtros y estadísticas se abren desde «aA» y desde el informe de privacidad. El informe explica que, con uBlock activo, es normal ver pocos bloqueos de Gecko.
+- **Detalles** (#13): las contraseñas pedidas desde pestañas de fondo no ofrecen las de `https` si no consta que la página lo es; la barra solo abre `http(s)` y `about:` escritos a mano; Gradle Wrapper 9.8.2.
+
 ## 1.0.4 · Gecko 159
 - Motor GeckoView 159.0.20261102144711, con los últimos parches de seguridad de Mozilla.
 

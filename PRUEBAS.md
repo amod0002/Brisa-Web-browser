@@ -207,14 +207,23 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Descarga grande: sale notificación con progreso; salir de Brisa no la corta.
 - [ ] Descarga desde una pestaña privada: no aparece en la lista al reabrir la app; la notificación no muestra el nombre.
 
-## 23. Android
+## 23. Novedades 1.0.5
+- [ ] Estirar para recargar: en lo alto de una web, tirar hacia abajo → círculo con flecha que gira; al pasar el umbral se pone azul y al soltar recarga (indicador girando hasta que termina).
+- [ ] No salta en Google Maps (mover el mapa hacia abajo), en un chat con scroll propio ni en un carrusel.
+- [ ] En el Inicio no hace nada. En tablet, el indicador sale debajo de la barra.
+- [ ] Ajustes → «Estirar hacia abajo para recargar» apagado: no hace nada.
+- [ ] «aA» → uBlock Origin activo → abre su panel (ajustes, filtros, estadísticas) en una pestaña nueva.
+- [ ] Informe de privacidad → botón «Estadísticas y filtros de uBlock Origin».
+- [ ] Barra: `file:///sdcard` o `intent://…` se buscan; `about:blank` abre.
+
+## 24. Android
 - [ ] Gesto «atrás»: cierra menú/teclado/cuadrícula y luego va a la página anterior.
 - [ ] Un enlace desde otra app (WhatsApp, correo) se abre en una pestaña nueva.
 - [ ] Compartir envía la URL.
 - [ ] Tema claro/oscuro y colores de Material You.
 - [ ] Girar el móvil no recarga la página.
 
-## 24. Velocidad (comparar con Chrome)
+## 25. Velocidad (comparar con Chrome)
 - [ ] Abrir elpais.com, marca.com y youtube.com: sensación de carga igual o mejor.
 - [ ] Scroll fluido en páginas largas, sin tirones.
 
