@@ -402,10 +402,14 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                 newTab = { u, priv ->
                     val nt = Tab(ctx, priv, u)
                     tabs.add(tabs.indexOf(t) + 1, nt)
-                    if (priv) select(tabs.indexOf(nt))
-                    android.widget.Toast.makeText(ctx, if (priv) "Abierta en pestaña privada" else "Abierta en una pestaña nueva", android.widget.Toast.LENGTH_SHORT).show()
+                    // Si cambia de modo (normal ↔ privada) se salta a ella; si no, se queda detrás como en Safari
+                    if (priv != t.private) select(tabs.indexOf(nt))
+                    android.widget.Toast.makeText(ctx, when {
+                        priv && t.private -> "Abierta en otra pestaña privada"
+                        priv -> "Abierta en pestaña privada"
+                        else -> "Abierta en una pestaña nueva" }, android.widget.Toast.LENGTH_SHORT).show()
                 },
-                open = { t.open(it) })
+                open = { t.open(it) }, fromPrivate = t.private)
         }
         if (showSettings) SettingsSheet { showSettings = false }
         if (showHistory) HistorySheet({ showHistory = false }) { tab.open(it) }
