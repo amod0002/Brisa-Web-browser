@@ -58,6 +58,28 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     private val ui = UiState()
 
     override fun openTab(tab: Tab) { tabs.add(current + 1, tab); current += 1 }
+    override fun closeTab(tab: Tab) {
+        val i = tabs.indexOf(tab); if (i < 0) return
+        val back = tab.opener?.let { tabs.indexOf(it) } ?: -1
+        tab.close(); tabs.removeAt(i)
+        if (tabs.isEmpty()) tabs += Tab(this, false, null)
+        current = when {
+            back >= 0 -> if (back > i) back - 1 else back
+            i < current -> current - 1
+            else -> current
+        }.coerceIn(0, tabs.lastIndex)
+    }
+    override fun focusTab(tab: Tab) {
+        val i = tabs.indexOf(tab); if (i < 0) return
+        current = i; ui.closeGrid++
+    }
+    /** Poca memoria: fuera las miniaturas de las pestañas que no se ven (se vuelven a hacer al abrir la cuadrícula). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        @Suppress("DEPRECATION")
+        if (level != android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+            tabs.forEachIndexed { i, t -> if (i != current) t.thumb = null }
+    }
     override fun contextMenu(tab: Tab, e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement) { ui.context = tab to e }
     override fun fullScreen(on: Boolean) {
         ui.fullScreen = on
@@ -129,6 +151,12 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Engine.get(this) // arranca el motor cuanto antes
+        // Atrás sin nada que deshacer: Brisa se va al fondo, NUNCA se cierra (#41). Si se cerrase, al volver
+        // tendría que montarse otra vez entera. Si se abrió desde el icono, Android ya lo hace solo y con su
+        // animación de «volver a inicio»; esto es para cuando se abrió con un enlace de otra app.
+        if (intent?.action != Intent.ACTION_MAIN) onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { moveTaskToBack(true) }
+        })
         Tab.tabHost = this
         Downloads.load(this)
         Engine.get(this)
@@ -176,8 +204,15 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     /** Notificación de una web tocada: si la web sigue viva, decide ella; si no, se abre la web que la mandó (#34). */
     private fun fromNotification(i: Intent?): String? {
         val tag = i?.getStringExtra(WebNotifs.EXTRA_TAG) ?: return null
-        if (WebNotifs.clicked(tag)) return null
-        return i.getStringExtra(WebNotifs.EXTRA_SOURCE)?.let(::safeIncoming)
+        val source = i.getStringExtra(WebNotifs.EXTRA_SOURCE)?.let(::safeIncoming)
+        if (WebNotifs.clicked(tag)) {
+            // Plan B por si la web no pide ponerse delante: ir a la pestaña de esa web (#39)
+            val h = History.hostOf(source ?: return null)
+            if (tabs.getOrNull(current)?.let { History.hostOf(it.url) } != h)
+                tabs.indexOfFirst { History.hostOf(it.url) == h }.takeIf { it >= 0 }?.let { current = it; ui.closeGrid++ }
+            return null
+        }
+        return source
     }
 
     override fun onDestroy() {
@@ -216,12 +251,12 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     override fun onResume() {
         super.onResume()
         // Una privada bloqueada sigue en pausa (sin audio ni vídeo) hasta desbloquearla
-        tabs.getOrNull(current)?.let { t -> if (!(t.private && ui.privateLocked)) t.session.setActive(true) }
+        tabs.getOrNull(current)?.let { t -> if (!(t.private && ui.privateLocked)) t.active(true) }
     }
 
     override fun onPause() {
         super.onPause()
-        tabs.forEach { it.session.setActive(false) }
+        tabs.forEach { it.active(false) }
         val a = org.json.JSONArray()
         tabs.filter { !it.private && !it.isHome }.forEach {
             a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: ""))
@@ -242,6 +277,8 @@ class UiState {
     var fullScreen by mutableStateOf(false)
     val dialogs = mutableStateListOf<Dialog>()
     var privateLocked by mutableStateOf(false)
+    /** Sube cuando hay que salir de la cuadrícula de pestañas (una web pide ponerse delante). */
+    var closeGrid by mutableIntStateOf(0)
     /** Atajos de teclado: los recibe la actividad y los resuelve la pantalla. */
     var shortcut: ((String) -> Boolean)? = null
     /** Centro del botón de descargas (para la animación del icono que vuela hasta él). */
@@ -256,6 +293,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     val ctx = LocalContext.current
     val tab = tabs[current.coerceIn(0, tabs.lastIndex)]
     var showTabs by remember { mutableStateOf(false) }
+    LaunchedEffect(ui.closeGrid) { if (ui.closeGrid > 0) showTabs = false }
     var showMenu by remember { mutableStateOf(false) }
     var showDownloads by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
@@ -286,11 +324,12 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     }
 
     LaunchedEffect(tab) {
+        tab.ensureOpen() // antes de dársela a la vista: si no, GeckoView abriría la sesión con otro motor
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
         Tab.visible = tab
-        if (!(tab.private && ui.privateLocked)) { tab.session.setActive(true); tab.wake() }
+        if (!(tab.private && ui.privateLocked)) { tab.active(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
-        tabs.forEach { if (it !== tab) it.session.setActive(false) }
+        tabs.forEach { if (it !== tab) it.active(false) }
     }
     LaunchedEffect(tab.scrollDelta) {
         if (tab.scrollDelta > 8) collapsed = true else if (tab.scrollDelta < -8) collapsed = false
@@ -299,8 +338,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     // Pestaña privada bloqueada: ni se ve el dominio, ni se navega, ni suena, hasta la huella/PIN
     val locked = tab.private && ui.privateLocked
     LaunchedEffect(locked) {
-        if (locked) { tab.session.setActive(false); editing = false; showMenu = false; tab.endFind() }
-        else { tab.session.setActive(true); tab.wake() }
+        if (locked) { tab.active(false); editing = false; showMenu = false; tab.endFind() }
+        else { tab.active(true); tab.wake() }
     }
 
     fun newTab(private: Boolean = false) {
@@ -369,7 +408,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             }
             else if (wide && !ui.fullScreen) {
                 TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
-                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) },
+                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) },
                     onNewTab = { newTab(tab.private) }, ui = ui, onDownloads = { showDownloads = true })
                 if (tab.findText != null) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.widthIn(max = 640.dp)) { FindBar(tab) }
@@ -432,7 +471,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
                         }
                         DownloadButton(ui) { showDownloads = true }
-                        IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.thumb = it }, { }) }) {
+                        IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) }) {
                             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                                 Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }

@@ -142,6 +142,10 @@ interface TabHost {
     fun openTab(tab: Tab)
     fun contextMenu(tab: Tab, e: GeckoSession.ContentDelegate.ContextElement)
     fun fullScreen(on: Boolean)
+    /** La web pide cerrar su ventana (window.close(), #38): se cierra y se vuelve a la que la abrió. */
+    fun closeTab(tab: Tab)
+    /** La web pide ponerse delante (window.focus(), p. ej. al tocar su notificación, #39). */
+    fun focusTab(tab: Tab)
 }
 
 /**
@@ -152,7 +156,19 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
           lazy: Boolean = false) {
     /** Pestaña restaurada que aún no se ha cargado: se carga la primera vez que se muestra. */
     private var pending: (() -> Unit)? = null
-    fun wake() { pending?.let { pending = null; it() } }
+    /** Se muestra por primera vez: abre su sesión en el motor (#36) y carga la página. Antes se espera a que se
+     *  hayan retirado los «Solo esta vez» de la vez anterior (#40). */
+    fun wake() { ensureOpen(); pending?.let { pending = null; Permissions.whenReady(it) } }
+    /** Las pestañas restauradas no abren su sesión hasta que se ven: con 30 pestañas el arranque es como con 1. */
+    fun ensureOpen() { if (!session.isOpen) session.open(Engine.get(ctx)) }
+    /** Pausar/reanudar sin tocar sesiones que aún no se han abierto. */
+    fun active(on: Boolean) { if (session.isOpen) session.setActive(on) }
+    /** Pestaña que la abrió con window.open (para volver a ella al cerrarse, #38). */
+    var opener: Tab? = null
+    /** Último estado conocido, también en privadas (solo en memoria): para recuperar la pestaña si Gecko se cae (#36). */
+    private var lastState: GeckoSession.SessionState? = null
+    private var crashes = 0
+    private var lastCrash = 0L
     /** Grupo de pestañas (null = sin grupo). */
     var group by mutableStateOf(group)
     var state: String? = restore
@@ -190,7 +206,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
-            override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
+            override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { lastState = st; if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
             override fun onTitleChange(s: GeckoSession, t: String?) {
@@ -201,6 +217,12 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }
             override fun onFullScreen(s: GeckoSession, on: Boolean) { tabHost?.fullScreen(on) }
+            override fun onCloseRequest(s: GeckoSession) { tabHost?.closeTab(this@Tab) }
+            override fun onFocusRequest(s: GeckoSession) { tabHost?.focusTab(this@Tab) }
+            // El proceso que pinta las webs se ha caído (onCrash: la sesión queda cerrada) o Android lo ha
+            // matado por memoria (onKill): se recupera la pestaña en vez de dejarla en negro (#36)
+            override fun onCrash(s: GeckoSession) { recover(reopen = true) }
+            override fun onKill(s: GeckoSession) { recover(reopen = false) }
         }
         if (!private) historyDelegate = object : GeckoSession.HistoryDelegate {
             override fun onVisited(s: GeckoSession, u: String, last: String?, flags: Int): GeckoResult<Boolean> {
@@ -238,7 +260,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onCanGoForward(s: GeckoSession, v: Boolean) { canForward = v }
             // Enlaces target=_blank y window.open: pestaña nueva junto a esta.
             override fun onNewSession(s: GeckoSession, uri: String): GeckoResult<GeckoSession> {
-                val t: Tab = Tab(ctx, private, uri, openNow = false)
+                val t: Tab = Tab(ctx, private, uri, openNow = false).also { it.opener = this@Tab }
                 tabHost?.openTab(t)
                 return GeckoResult.fromValue(t.session)
             }
@@ -260,7 +282,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
         promptDelegate = prompts
         permissionDelegate = Permissions { tabHost as? PromptHost }
-        if (openNow && !isOpen) open(Engine.get(ctx)) else Engine.get(ctx)
+        if (openNow && !isOpen && !lazy) open(Engine.get(ctx)) else Engine.get(ctx)
         val session = this
         Engine.withBuiltIn { ext ->
             session.webExtensionController.setMessageDelegate(ext, object : WebExtension.MessageDelegate {
@@ -289,7 +311,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 val st = restore?.let { runCatching { GeckoSession.SessionState.fromString(it) }.getOrNull() }
                 if (st != null) restoreState(st) else if (!startUrl.isNullOrBlank()) loadUri(startUrl)
             }
-            if (lazy) pending = go else go()
+            if (lazy) pending = go else Permissions.whenReady(go)
         }
     }
 
@@ -297,13 +319,13 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
     /** Lo que se escribe a mano en la barra: pasa por toUrl() (dirección, red local o búsqueda). */
-    fun load(input: String) { pending = null; val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+    fun load(input: String) { pending = null; ensureOpen(); val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
 
     /**
      * Direcciones que YA son direcciones (imágenes data:/blob:, favoritos, historial, páginas de extensiones):
      * se abren tal cual y nunca se mandan al buscador. Gecko decide si se pueden mostrar.
      */
-    fun open(address: String) { pending = null; session.loadUri(address); url = address }
+    fun open(address: String) { pending = null; ensureOpen(); session.loadUri(address); url = address }
 
     /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
     fun toggleReader() {
@@ -336,7 +358,33 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     private var lastFind = ""
     fun endFind() { session.finder.clear(); findText = null; findResult = ""; lastFind = "" }
 
-    fun close() { Permissions.leaveSite(ctx, session, null); session.close() }
+    fun close() { Permissions.leaveSite(ctx, session, null); thumb = null; opener = null; if (session.isOpen) session.close() }
+
+    /** Recuperar la pestaña tras caerse su proceso. Si no es la visible, se recarga cuando se vuelva a mirar. */
+    private fun recover(reopen: Boolean) {
+        val now = System.currentTimeMillis()
+        crashes = if (now - lastCrash < 15_000) crashes + 1 else 1
+        lastCrash = now
+        val st = lastState; val u = url
+        val go = {
+            if (!session.isOpen) session.open(Engine.get(ctx))
+            // Si se cae una y otra vez, no se insiste: se queda en blanco y el usuario decide
+            if (crashes <= 2) { if (st != null) session.restoreState(st) else if (u.isNotBlank()) session.loadUri(u) }
+        }
+        if (reopen && this !== visible) { pending = go; return }
+        if (this === visible) {
+            go()
+            android.widget.Toast.makeText(ctx, if (crashes <= 2) "Esta pestaña se había cerrado. Recargada." else "Esta pestaña se cierra una y otra vez: no se ha recargado.", android.widget.Toast.LENGTH_SHORT).show()
+        } else pending = go
+    }
+
+    /** Miniatura para la cuadrícula a un tercio de tamaño: unos 1 MB en vez de 10 (#36). */
+    fun saveThumb(b: Bitmap?) {
+        if (b == null) return
+        val small = runCatching { Bitmap.createScaledBitmap(b, (b.width / 3).coerceAtLeast(1), (b.height / 3).coerceAtLeast(1), true) }.getOrNull() ?: return
+        if (small !== b) b.recycle()
+        thumb = small
+    }
 
     companion object {
         var tabHost: TabHost? = null

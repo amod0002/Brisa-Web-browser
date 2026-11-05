@@ -257,3 +257,11 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Abrir «Contraseñas guardadas» → la miniatura de Recientes sale en negro y no deja capturar.
 - [ ] Con las contraseñas abiertas, salir a Inicio y volver: la lista se ha cerrado y pide huella/PIN.
 - [ ] Recibir una notificación de una web → quitar Brisa de Recientes → tocar la notificación: abre Brisa con esa web.
+
+## 26. Novedades 1.0.8 · issues #36–#41
+- [ ] Con muchas pestañas guardadas (20-30), cerrar Brisa de Recientes y abrirla: arranca rápido. En la cuadrícula, tocar una pestaña dormida: carga con su historial atrás/adelante.
+- [ ] Volver atrás hasta salir de Brisa con el gesto: animación suave a inicio. Al volver, no recarga todas las pestañas ni parpadea en negro.
+- [ ] Con Brisa abierta, abrir un enlace desde Telegram o Gmail: en Recientes solo hay una Brisa y el enlace sale como pestaña nueva. Atrás desde ahí vuelve a la app de origen sin cerrar Brisa.
+- [ ] «Entrar con Google» (o GitHub) en una web que use ventana emergente: al terminar, la ventana se cierra sola y se vuelve a la web.
+- [ ] Dos pestañas, notificación de la que no se ve → tocarla: Brisa se abre en esa pestaña.
+- [ ] Abrir 15-20 pestañas, abrir la cuadrícula varias veces: Brisa no se cierra sola.

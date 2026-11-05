@@ -2,6 +2,16 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.8 · arranque rápido y pestañas que no se caen (issues #36–#41, gracias @perritys)
+- **Arranque** (#36): las pestañas guardadas no abren su sesión en el motor hasta que se miran; con 30 pestañas arranca como con 1.
+- **Pantalla en negro** (#36): si el proceso de las webs se cae o Android lo cierra por memoria, la pestaña se recupera sola.
+- **Memoria** (#36): las miniaturas de la cuadrícula ocupan un tercio de ancho y alto (≈1 MB en vez de 10) y se sueltan si falta memoria.
+- **Una sola Brisa** (#37): los enlaces de otras apps se abren en la Brisa que ya está abierta; ya no se pierden pestañas.
+- **Inicios de sesión** (#38): las ventanas de «Entrar con Google/Microsoft/GitHub» se cierran solas al terminar y se vuelve a la web original.
+- **Notificaciones** (#39): tocarla lleva a la pestaña de esa web.
+- **Permisos** (#40): las pestañas esperan a que se retiren los «Solo esta vez» de la vez anterior antes de cargar.
+- **Gesto atrás** (#41): animación de «volver a inicio» de Android y Brisa nunca se cierra al salir con atrás, así que al volver no recarga todo.
+
 ## 1.0.7 · seguridad de permisos, diálogos y contraseñas (issues #31–#34, gracias @perritys)
 - **Permisos** (#31): «Solo esta vez» ya no se queda para siempre si Android cierra Brisa: se apunta y se retira al volver a abrirla.
 - **Diálogos** (#33): un `alert()` que recarga la página ya no esquiva «Impedir más diálogos»; solo se reinicia al ir a otra web.
