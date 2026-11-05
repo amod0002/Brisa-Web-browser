@@ -275,7 +275,7 @@ fun PrivacySection() {
     toggle("Vídeo protegido (DRM)", "Para Netflix, Prime Video y similares. Apágalo si prefieres no usar el módulo de DRM", Privacy.drm, "drm")
     toggle("Preguntar antes de descargar", "Ninguna web puede descargarte un archivo sin que lo confirmes", Privacy.askDownloads, "preguntar_descargas")
     toggle("Bloquear pestañas privadas", "Al volver a Brisa, piden huella o PIN para verlas", Privacy.lockPrivate, "bloquear_privadas")
-    toggle("Borrar datos al salir", "Al cerrar Brisa se borran historial, cookies, caché y pestañas abiertas (cerrarás sesión en las webs)", Privacy.clearOnExit, "borrar_salir")
+    toggle("Borrar datos al salir", "Se borran historial, cookies, caché y pestañas (cerrarás sesión en las webs) al pulsar «Salir y borrar datos» en el menú aA, al quitar Brisa de Recientes o tras 5 minutos fuera de ella", Privacy.clearOnExit, "borrar_salir")
 
     OutlinedButton({ showPerms = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Permisos por web") }
     if (showPerms) SitePermissionsSheet { showPerms = false }

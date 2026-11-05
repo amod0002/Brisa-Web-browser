@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -121,6 +122,11 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
             ListItem(leadingContent = { Icon(Icons.Outlined.Settings, null) },
                 headlineContent = { Text("Ajustes") },
                 modifier = Modifier.clickable { dismiss(); openSettings() })
+            // #43: «atrás» no cierra Brisa (la manda al fondo), así que salir de verdad y borrar es un botón
+            if (Privacy.clearOnExit) ListItem(leadingContent = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = MaterialTheme.colorScheme.error) },
+                headlineContent = { Text("Salir y borrar datos", color = MaterialTheme.colorScheme.error) },
+                supportingContent = { Text("Cierra Brisa y borra historial, cookies, caché y pestañas") },
+                modifier = Modifier.clickable { dismiss(); (ctx as? MainActivity)?.quitAndWipe() })
         }
     }
 }

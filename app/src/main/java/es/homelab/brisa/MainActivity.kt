@@ -74,6 +74,16 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         current = i; ui.closeGrid++
     }
     /** Poca memoria: fuera las miniaturas de las pestañas que no se ven (se vuelven a hacer al abrir la cuadrícula). */
+    /** «Salir y borrar datos» (#43): borra todo y cierra Brisa de verdad, también de Recientes. */
+    fun quitAndWipe() {
+        wipeTabs()
+        Privacy.clearAll(this) { finishAndRemoveTask() }
+    }
+    private fun wipeTabs() {
+        tabs.forEach { it.close() }; tabs.clear(); tabsFile.delete()
+        tabs += Tab(this, false, null); current = 0
+    }
+
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         @Suppress("DEPRECATION")
@@ -232,6 +242,10 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onStart() {
         super.onStart()
+        // «Borrar datos al salir» (#43): más de 5 min fuera de Brisa cuenta como haber salido
+        if (Privacy.clearOnExit && !ownScreen && stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 5 * 60_000) {
+            wipeTabs(); Privacy.clearAll(this)
+        }
         if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000) {
             if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
             Secrets.relock++
