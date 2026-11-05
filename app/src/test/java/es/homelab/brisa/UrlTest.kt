@@ -172,4 +172,12 @@ class PasswordFondoTest {
         assertEquals(0, Passwords.match(listOf(l("https://a.com")), "a.com", null).size)
         assertEquals(1, Passwords.match(listOf(l("http://192.168.1.50:8006")), "192.168.1.50", null).size)
     }
+
+    // #31: los «Solo esta vez» guardados se retiran al arrancar; los demás permisos no se tocan
+    @Test fun soloEstaVezSeRetiraAlArrancar() {
+        val saved = setOf(Permissions.tempKey("mapa.com", 1), Permissions.tempKey("cam.es", 2))
+        val gecko = listOf("mapa.com" to 1, "mapa.com" to 3, "otra.com" to 1, "cam.es" to 2)
+        assertEquals(listOf("mapa.com" to 1, "cam.es" to 2), Permissions.stale(saved, gecko))
+        assertEquals(0, Permissions.stale(emptySet(), gecko).size)
+    }
 }

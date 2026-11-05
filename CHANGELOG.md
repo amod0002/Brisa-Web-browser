@@ -2,6 +2,12 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.7 · seguridad de permisos, diálogos y contraseñas (issues #31–#34, gracias @perritys)
+- **Permisos** (#31): «Solo esta vez» ya no se queda para siempre si Android cierra Brisa: se apunta y se retira al volver a abrirla.
+- **Diálogos** (#33): un `alert()` que recarga la página ya no esquiva «Impedir más diálogos»; solo se reinicia al ir a otra web.
+- **Contraseñas** (#32): sin capturas ni miniatura en «Recientes» mientras se ven, y al salir de Brisa hay que desbloquearlas otra vez.
+- **Notificaciones** (#34): si Android cerró Brisa, tocar una notificación abre la web que la mandó.
+
 ## 1.0.6 · privadas a prueba, permisos y notificaciones (issues #20–#29, gracias @perritys)
 - **Privacidad** (#26): «Abrir imagen», favoritos e historial abren la dirección tal cual (`data:`, `blob:`, páginas de extensiones) y nunca la mandan al buscador.
 - **Privadas** (#29): desde una privada, «Abrir en pestaña nueva» abre otra privada; pasar a normal es una opción explícita.

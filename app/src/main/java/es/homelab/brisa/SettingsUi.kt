@@ -108,7 +108,12 @@ fun SettingsSheet(dismiss: () -> Unit) {
             OutlinedButton({
                 (ctx as? PromptHost)?.unlock("Ver tus contraseñas guardadas") { ok -> if (ok) showPw = true } ?: run { showPw = true }
             }, Modifier.fillMaxWidth()) { Text("Contraseñas guardadas (${Passwords.logins.size})") }
-            if (showPw) PasswordsSheet { showPw = false }
+            if (showPw) {
+                val at = remember { Secrets.relock }
+                LaunchedEffect(Secrets.relock) { if (Secrets.relock != at) showPw = false }
+                DisposableEffect(Unit) { Secrets.open++; onDispose { Secrets.open-- } }
+                PasswordsSheet { showPw = false }
+            }
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Ofrecer guardar contraseñas", Modifier.weight(1f))
                 Switch(Passwords.offerSave, { Passwords.changeOfferSave(it) })
@@ -139,7 +144,8 @@ fun PasswordsSheet(dismiss: () -> Unit) {
         cm.setPrimaryClip(clip)
         android.widget.Toast.makeText(ctx, "$label copiado", android.widget.Toast.LENGTH_SHORT).show()
     }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        properties = ModalBottomSheetProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn)) {
         Column(Modifier.padding(horizontal = 20.dp)) {
             Text("Contraseñas", style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), singleLine = true,
@@ -172,6 +178,7 @@ fun PasswordsSheet(dismiss: () -> Unit) {
         var visible by remember(l.guid) { mutableStateOf(false) }
         var confirmDelete by remember(l.guid) { mutableStateOf(false) }
         AlertDialog(onDismissRequest = { open = null },
+            properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             icon = { SiteIcon(l.host, 40.dp) },
             title = { Text(l.host) },
             text = { Column {

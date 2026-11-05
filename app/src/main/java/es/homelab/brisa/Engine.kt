@@ -41,6 +41,7 @@ object Engine {
             .build()
     ).also { rt ->
         runtime = rt
+        Permissions.init(ctx.applicationContext, rt)
         Passwords.init(ctx)
         rt.setWebNotificationDelegate(WebNotifs(ctx.applicationContext))
         Report.load(ctx)
@@ -186,7 +187,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs() }
+            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { if (!private) state = st.toString() }
