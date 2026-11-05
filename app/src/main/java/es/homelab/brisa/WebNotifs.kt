@@ -26,7 +26,7 @@ class WebNotifs(private val ctx: Context) : WebNotificationDelegate {
             nm.createNotificationChannel(NotificationChannel(CHANNEL_SILENT, "Notificaciones de las webs (silenciosas)", NotificationManager.IMPORTANCE_LOW))
         }
         val open = PendingIntent.getActivity(ctx, n.tag.hashCode(),
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_TAG, n.tag),
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_TAG, n.tag).putExtra(EXTRA_SOURCE, n.source),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val gone = PendingIntent.getBroadcast(ctx, n.tag.hashCode(),
             Intent(ctx, Dismissed::class.java).putExtra(EXTRA_TAG, n.tag), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -58,8 +58,10 @@ class WebNotifs(private val ctx: Context) : WebNotificationDelegate {
         const val CHANNEL = "webs"
         const val CHANNEL_SILENT = "webs_silencio"
         const val EXTRA_TAG = "brisa.notificacion"
+        const val EXTRA_SOURCE = "brisa.notificacion.web"
         private val live = java.util.concurrent.ConcurrentHashMap<String, WebNotification>()
         /** Se tocó la notificación: la web decide qué abrir (normalmente su propia página). */
-        fun clicked(tag: String) { live.remove(tag)?.click() }
+        /** Devuelve false si ya no está (Android cerró Brisa entretanto): entonces se abre la web que la mandó (#34). */
+        fun clicked(tag: String): Boolean = live.remove(tag)?.let { it.click(); true } ?: false
     }
 }

@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
                     group = it.optString("group").ifEmpty { null }, lazy = true)
             }
         }
-        val incoming = intent?.dataString?.let(::safeIncoming)
+        val incoming = intent?.dataString?.let(::safeIncoming) ?: fromNotification(intent)
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
         current = tabs.lastIndex
@@ -166,8 +166,18 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra(WebNotifs.EXTRA_TAG)?.let { WebNotifs.clicked(it); return }
+        if (intent.hasExtra(WebNotifs.EXTRA_TAG)) {
+            fromNotification(intent)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
+            return
+        }
         intent.dataString?.let(::safeIncoming)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
+    }
+
+    /** Notificación de una web tocada: si la web sigue viva, decide ella; si no, se abre la web que la mandó (#34). */
+    private fun fromNotification(i: Intent?): String? {
+        val tag = i?.getStringExtra(WebNotifs.EXTRA_TAG) ?: return null
+        if (WebNotifs.clicked(tag)) return null
+        return i.getStringExtra(WebNotifs.EXTRA_SOURCE)?.let(::safeIncoming)
     }
 
     override fun onDestroy() {
@@ -187,7 +197,10 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onStart() {
         super.onStart()
-        if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000 && Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+        if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000) {
+            if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+            Secrets.relock++
+        }
         ownScreen = false
     }
 
@@ -197,6 +210,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         stoppedAt = System.currentTimeMillis()
         // Al salir de la app, las pestañas privadas quedan bloqueadas hasta la huella/PIN
         if (!ownScreen && Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
+        if (!ownScreen) Secrets.relock++
     }
 
     override fun onResume() {
@@ -214,6 +228,13 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         }
         if (!Privacy.clearOnExit) runCatching { tabsFile.writeText(a.toString()) }
     }
+}
+
+/** Pantallas con secretos a la vista (contraseñas): sin capturas y se cierran al salir de Brisa (#32). */
+object Secrets {
+    var open by mutableIntStateOf(0)
+    /** Sube al salir de la app (o al volver tras más de 2 min en una pantalla propia): hay que desbloquear otra vez. */
+    var relock by mutableIntStateOf(0)
 }
 
 class UiState {
@@ -297,7 +318,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     val wide = conf.smallestScreenWidthDp >= 600 && conf.screenWidthDp >= 600
 
     // Con pestañas privadas abiertas, Android no guarda la miniatura de Brisa en «Recientes»
-    val anyPrivate = tabs.any { it.private }
+    // …ni con las contraseñas a la vista (#32)
+    val anyPrivate = tabs.any { it.private } || Secrets.open > 0
     LaunchedEffect(anyPrivate) {
         val act = ctx as? android.app.Activity
         // Con pestañas privadas: sin capturas de pantalla ni miniatura en «Recientes»

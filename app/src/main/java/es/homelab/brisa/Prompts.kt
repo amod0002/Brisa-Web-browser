@@ -44,8 +44,14 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?, pri
     private var blockDialogs = false
     private var dialogCount = 0
     private var firstDialogAt = 0L
-    /** Al cargar otra página se vuelven a permitir los diálogos. */
-    fun resetDialogs() { blockDialogs = false; dialogCount = 0 }
+    private var dialogHost: String? = null
+    /** Al ir a OTRA web se vuelven a permitir los diálogos. Recargar la misma no los reinicia (#33: el truco
+     *  de alert() + location.reload() de las webs de estafa). */
+    fun resetDialogs(url: String) {
+        val h = History.hostOf(url)
+        if (h == dialogHost) return
+        dialogHost = h; blockDialogs = false; dialogCount = 0; firstDialogAt = 0L
+    }
     /** Cuenta el diálogo; devuelve true si ya toca ofrecer «Impedir más diálogos» (2.º en 30 s). */
     private fun countDialog(): Boolean {
         val now = System.currentTimeMillis()
@@ -250,17 +256,41 @@ class Permissions(private val host: () -> PromptHost?) : PermissionDelegate {
 
     /** «Solo esta vez»: se guarda el permiso concedido para retirarlo al salir de la web o cerrar la pestaña (#24). */
     private fun rememberOnce(s: GeckoSession, p: ContentPermission) {
-        synchronized(temporary) { temporary += Triple(s, History.hostOf(p.uri), p) }
+        val h = History.hostOf(p.uri)
+        synchronized(temporary) { temporary += Triple(s, h, p) }
+        // También en disco (#31): si Android cierra Brisa antes de retirarlo, se retira al volver a arrancar
+        store?.let { st -> st.edit().putStringSet(KEY, (st.getStringSet(KEY, null).orEmpty() + tempKey(h, p.permission))).apply() }
     }
 
     companion object {
+        private const val KEY = "permisos_solo_esta_vez"
+        private var store: android.content.SharedPreferences? = null
         private val temporary = mutableListOf<Triple<GeckoSession, String, ContentPermission>>()
+        fun tempKey(host: String, type: Int) = "$host\t$type"
+        /** Qué permisos de Gecko son restos de un «Solo esta vez» que no llegó a retirarse. */
+        fun stale(saved: Set<String>, perms: List<Pair<String, Int>>) = perms.filter { (h, t) -> tempKey(h, t) in saved }
+
+        /** Al arrancar el motor: se retiran los «Solo esta vez» que quedaron de la vez anterior (#31). */
+        fun init(ctx: android.content.Context, rt: org.mozilla.geckoview.GeckoRuntime) {
+            val st = ctx.getSharedPreferences("permisos", 0).also { store = it }
+            val saved = st.getStringSet(KEY, null).orEmpty().toSet()
+            if (saved.isEmpty()) return
+            st.edit().remove(KEY).commit()
+            rt.storageController.allPermissions.accept { all ->
+                val list = all.orEmpty()
+                val bad = stale(saved, list.map { History.hostOf(it.uri) to it.permission }).toSet()
+                list.filter { (History.hostOf(it.uri) to it.permission) in bad && it.value == ContentPermission.VALUE_ALLOW }
+                    .forEach { runCatching { rt.storageController.setPermission(it, ContentPermission.VALUE_PROMPT) } }
+            }
+        }
         /** La pestaña [s] se va a [newHost] (o se cierra, si es null): se retiran sus permisos temporales de otras webs. */
         fun leaveSite(ctx: android.content.Context, s: GeckoSession, newHost: String?) {
             val gone = synchronized(temporary) {
                 temporary.filter { it.first === s && it.second != newHost }.also { temporary.removeAll(it) }
             }
             if (gone.isEmpty()) return
+            val keep = synchronized(temporary) { temporary.map { tempKey(it.second, it.third.permission) }.toSet() }
+            store?.let { st -> st.edit().putStringSet(KEY, st.getStringSet(KEY, null).orEmpty().filter { it in keep }.toSet()).apply() }
             val sc = Engine.get(ctx).storageController
             gone.forEach { (_, _, p) -> runCatching { sc.setPermission(p, ContentPermission.VALUE_PROMPT) } }
         }

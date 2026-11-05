@@ -250,3 +250,10 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Login de un servicio del homelab (p. ej. Proxmox): rellena y entra.
 - [ ] Una descarga termina y se abre desde la lista.
 - [ ] Modo lectura en un artículo de noticias.
+
+## 25. Novedades 1.0.7 · issues #31–#34
+- [ ] Dar ubicación «Solo esta vez» a una web → quitar Brisa de Recientes → abrirla y volver a esa web: vuelve a preguntar.
+- [ ] Página con `alert("hola"); location.reload();` → desde el 2.º aviso sale la casilla; al marcarla no salen más aunque siga recargando. Ir a otra web: vuelven los diálogos.
+- [ ] Abrir «Contraseñas guardadas» → la miniatura de Recientes sale en negro y no deja capturar.
+- [ ] Con las contraseñas abiertas, salir a Inicio y volver: la lista se ha cerrado y pide huella/PIN.
+- [ ] Recibir una notificación de una web → quitar Brisa de Recientes → tocar la notificación: abre Brisa con esa web.
