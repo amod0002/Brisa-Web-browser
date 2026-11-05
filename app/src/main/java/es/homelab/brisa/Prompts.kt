@@ -270,18 +270,27 @@ class Permissions(private val host: () -> PromptHost?) : PermissionDelegate {
         /** Qué permisos de Gecko son restos de un «Solo esta vez» que no llegó a retirarse. */
         fun stale(saved: Set<String>, perms: List<Pair<String, Int>>) = perms.filter { (h, t) -> tempKey(h, t) in saved }
 
+        /** Mientras se retiran los de la vez anterior, las pestañas esperan para cargar (#40). */
+        private var waiting: MutableList<() -> Unit>? = null
+        fun whenReady(f: () -> Unit) { val w = waiting; if (w == null) f() else w += f }
+        private fun ready() { val w = waiting ?: return; waiting = null; w.forEach { it() } }
+
         /** Al arrancar el motor: se retiran los «Solo esta vez» que quedaron de la vez anterior (#31). */
         fun init(ctx: android.content.Context, rt: org.mozilla.geckoview.GeckoRuntime) {
             val st = ctx.getSharedPreferences("permisos", 0).also { store = it }
             val saved = st.getStringSet(KEY, null).orEmpty().toSet()
             if (saved.isEmpty()) return
             st.edit().remove(KEY).commit()
-            rt.storageController.allPermissions.accept { all ->
+            waiting = mutableListOf()
+            // Por si Gecko no contestara: como mucho se espera 3 s
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ ready() }, 3000)
+            rt.storageController.allPermissions.accept({ all ->
                 val list = all.orEmpty()
                 val bad = stale(saved, list.map { History.hostOf(it.uri) to it.permission }).toSet()
                 list.filter { (History.hostOf(it.uri) to it.permission) in bad && it.value == ContentPermission.VALUE_ALLOW }
                     .forEach { runCatching { rt.storageController.setPermission(it, ContentPermission.VALUE_PROMPT) } }
-            }
+                ready()
+            }, { ready() })
         }
         /** La pestaña [s] se va a [newHost] (o se cierra, si es null): se retiran sus permisos temporales de otras webs. */
         fun leaveSite(ctx: android.content.Context, s: GeckoSession, newHost: String?) {
