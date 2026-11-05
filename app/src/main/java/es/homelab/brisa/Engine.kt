@@ -379,7 +379,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     }
 
     /** Miniatura para la cuadrícula a un tercio de tamaño: unos 1 MB en vez de 10 (#36). */
-    fun setThumb(b: Bitmap?) {
+    fun saveThumb(b: Bitmap?) {
         if (b == null) return
         val small = runCatching { Bitmap.createScaledBitmap(b, (b.width / 3).coerceAtLeast(1), (b.height / 3).coerceAtLeast(1), true) }.getOrNull() ?: return
         if (small !== b) b.recycle()

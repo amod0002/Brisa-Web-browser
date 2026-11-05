@@ -408,7 +408,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             }
             else if (wide && !ui.fullScreen) {
                 TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
-                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.setThumb(it) }, { }) },
+                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) },
                     onNewTab = { newTab(tab.private) }, ui = ui, onDownloads = { showDownloads = true })
                 if (tab.findText != null) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.widthIn(max = 640.dp)) { FindBar(tab) }
@@ -471,7 +471,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
                         }
                         DownloadButton(ui) { showDownloads = true }
-                        IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.setThumb(it) }, { }) }) {
+                        IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) }) {
                             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                                 Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
