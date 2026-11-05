@@ -265,3 +265,8 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] «Entrar con Google» (o GitHub) en una web que use ventana emergente: al terminar, la ventana se cierra sola y se vuelve a la web.
 - [ ] Dos pestañas, notificación de la que no se ve → tocarla: Brisa se abre en esa pestaña.
 - [ ] Abrir 15-20 pestañas, abrir la cuadrícula varias veces: Brisa no se cierra sola.
+
+## 27. Novedades 1.0.8.1 · issue #43
+- [ ] Activar «Borrar datos al salir», iniciar sesión en una web → menú aA → «Salir y borrar datos»: Brisa se cierra y desaparece de Recientes. Al abrirla: sesión cerrada, sin historial ni pestañas.
+- [ ] Con el ajuste activado, salir a Inicio más de 5 minutos y volver: todo borrado. Con menos de 5 minutos, sigue igual.
+- [ ] Con el ajuste desactivado, el menú aA no muestra «Salir y borrar datos».

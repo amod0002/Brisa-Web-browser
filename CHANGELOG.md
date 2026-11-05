@@ -2,6 +2,11 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.8.1 · «Borrar datos al salir» que borra de verdad (issue #43, gracias @perritys)
+- Con el ajuste activado, el menú aA tiene **«Salir y borrar datos»**: borra todo y cierra Brisa, también de Recientes.
+- Pasar más de 5 minutos fuera de Brisa también cuenta como salir: al volver está todo borrado.
+- El texto del ajuste explica cuándo se borra.
+
 ## 1.0.8 · arranque rápido y pestañas que no se caen (issues #36–#41, gracias @perritys)
 - **Arranque** (#36): las pestañas guardadas no abren su sesión en el motor hasta que se miran; con 30 pestañas arranca como con 1.
 - **Pantalla en negro** (#36): si el proceso de las webs se cae o Android lo cierra por memoria, la pestaña se recupera sola.
