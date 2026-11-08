@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.flow.first
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -204,6 +205,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        wipeIfAway()
         if (intent.hasExtra(WebNotifs.EXTRA_TAG)) {
             fromNotification(intent)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
             return
@@ -240,12 +242,22 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         ownScreen = true; super.startActivityForResult(intent, requestCode, options)
     }
 
+    // «Borrar datos al salir»: 5 minutos fuera de Brisa cuentan como haber salido, se saliera como se saliera
+    // (también a otra app con «Compartir», #49). Se borra a los 5 minutos con un temporizador (#51) y, si
+    // Android congeló Brisa y no llegó a saltar, al volver, ANTES de abrir el enlace o la notificación
+    // que la trae de vuelta (#50: onNewIntent llega antes que onStart).
+    private val wipeTimer = android.os.Handler(android.os.Looper.getMainLooper())
+    private val wipeNow = Runnable { wipeTabs(); Privacy.clearAll(this); wipeDue = false }
+    private var wipeDue = false
+    private fun wipeIfAway() {
+        wipeTimer.removeCallbacks(wipeNow)
+        if (wipeDue && Privacy.clearOnExit && System.currentTimeMillis() - stoppedAt > WIPE_AFTER) wipeNow.run()
+        wipeDue = false
+    }
+
     override fun onStart() {
         super.onStart()
-        // «Borrar datos al salir» (#43): más de 5 min fuera de Brisa cuenta como haber salido
-        if (Privacy.clearOnExit && !ownScreen && stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 5 * 60_000) {
-            wipeTabs(); Privacy.clearAll(this)
-        }
+        wipeIfAway()
         if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000) {
             if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
             Secrets.relock++
@@ -257,6 +269,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         super.onStop()
         Report.save()
         stoppedAt = System.currentTimeMillis()
+        if (Privacy.clearOnExit) { wipeDue = true; wipeTimer.postDelayed(wipeNow, WIPE_AFTER) }
         // Al salir de la app, las pestañas privadas quedan bloqueadas hasta la huella/PIN
         if (!ownScreen && Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
         if (!ownScreen) Secrets.relock++
@@ -264,12 +277,16 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onResume() {
         super.onResume()
+        Tab.foreground = true
+        // Pestaña visible que se cayó con Brisa en segundo plano: se recupera ahora (#44)
+        tabs.getOrNull(current)?.let { t -> if (!(t.private && ui.privateLocked)) t.wake() }
         // Una privada bloqueada sigue en pausa (sin audio ni vídeo) hasta desbloquearla
         tabs.getOrNull(current)?.let { t -> if (!(t.private && ui.privateLocked)) t.active(true) }
     }
 
     override fun onPause() {
         super.onPause()
+        Tab.foreground = false
         tabs.forEach { it.active(false) }
         val a = org.json.JSONArray()
         tabs.filter { !it.private && !it.isHome }.forEach {
@@ -285,6 +302,8 @@ object Secrets {
     /** Sube al salir de la app (o al volver tras más de 2 min en una pantalla propia): hay que desbloquear otra vez. */
     var relock by mutableIntStateOf(0)
 }
+
+private const val WIPE_AFTER = 5 * 60_000L
 
 class UiState {
     var context by mutableStateOf<Pair<Tab, org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement>?>(null)
@@ -333,20 +352,23 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             if (d >= threshold && !tab.isHome) { refreshing = true; tab.session.reload() }
         }
     }
-    LaunchedEffect(refreshing, tab.progress) {
-        if (refreshing && tab.progress == 100) { kotlinx.coroutines.delay(250); refreshing = false }
+    // #47: progress y scroll se leen con snapshotFlow, sin recomponer toda la pantalla en cada evento
+    LaunchedEffect(refreshing, tab) {
+        if (!refreshing) return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { tab.progress }.first { it == 100 }
+        kotlinx.coroutines.delay(250); refreshing = false
     }
 
     LaunchedEffect(tab) {
-        tab.ensureOpen() // antes de dársela a la vista: si no, GeckoView abriría la sesión con otro motor
+        tab.awaitOpen() // antes de dársela a la vista: si no, GeckoView abriría la sesión con otro motor
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
         Tab.visible = tab
         if (!(tab.private && ui.privateLocked)) { tab.active(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
         tabs.forEach { if (it !== tab) it.active(false) }
     }
-    LaunchedEffect(tab.scrollDelta) {
-        if (tab.scrollDelta > 8) collapsed = true else if (tab.scrollDelta < -8) collapsed = false
+    LaunchedEffect(tab) {
+        androidx.compose.runtime.snapshotFlow { tab.barsHidden }.collect { collapsed = it }
     }
 
     // Pestaña privada bloqueada: ni se ve el dominio, ni se navega, ni suena, hasta la huella/PIN
