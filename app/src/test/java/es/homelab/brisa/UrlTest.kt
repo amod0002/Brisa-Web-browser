@@ -180,4 +180,15 @@ class PasswordFondoTest {
         assertEquals(listOf("mapa.com" to 1, "cam.es" to 2), Permissions.stale(saved, gecko))
         assertEquals(0, Permissions.stale(emptySet(), gecko).size)
     }
+
+    // Enlaces a apps: los web los abre Gecko; tg://, intent://… van a apps; file:// y content:// nunca
+    @Test fun enlacesAApps() {
+        assertEquals(null, ExternalApps.isExternal("https://youtube.com/watch?v=1"))
+        assertEquals(null, ExternalApps.isExternal("about:blank"))
+        assertEquals(true, ExternalApps.isExternal("tg://resolve?domain=x"))
+        assertEquals(true, ExternalApps.isExternal("intent://scan/#Intent;scheme=zxing;end"))
+        assertEquals(true, ExternalApps.isExternal("mailto:a@b.es"))
+        assertEquals(false, ExternalApps.isExternal("file:///sdcard/x"))
+        assertEquals(false, ExternalApps.isExternal("content://com.whatsapp.provider/x"))
+    }
 }

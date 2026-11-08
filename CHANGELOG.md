@@ -2,6 +2,14 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.9 · enlaces que se abren en su app y más fluidez (issues #44–#51)
+- **Abrir en la app**: los enlaces de YouTube, WhatsApp, Telegram, Maps… tocados desde otra web ofrecen «¿Abrir en YouTube?». También funcionan los enlaces `tg://`, `whatsapp://`, `intent://`, `mailto:`, `tel:`… (antes daban error). Ajustes: «Abrir enlaces en sus apps» y «Preguntar antes» (en privadas siempre pregunta).
+- **Fluidez** (#47): el scroll y la carga ya no recomponen toda la interfaz; solo las barras cuando cambian.
+- **Avisos de cookies** (#48): el rechazo automático ya no carga la CPU al abrir webs (búsqueda agrupada, 6 s, sin recorrer iframes de anuncios).
+- **Borrar datos al salir**: se borra a los 5 minutos de salir de verdad (#51), también si se salió con «Compartir» o abriendo otra app (#49), y un enlace que trae de vuelta a Brisa ya no se pierde con el borrado (#50).
+- **Pestañas caídas en segundo plano** (#44): se recuperan al volver, sin gastar red ni avisos mientras tanto.
+- **Ventanas emergentes de inicio de sesión** (#45): Brisa deja que Gecko abra su sesión en vez de adelantarse.
+
 ## 1.0.8.1 · «Borrar datos al salir» que borra de verdad (issue #43, gracias @perritys)
 - Con el ajuste activado, el menú aA tiene **«Salir y borrar datos»**: borra todo y cierra Brisa, también de Recientes.
 - Pasar más de 5 minutos fuera de Brisa también cuenta como salir: al volver está todo borrado.

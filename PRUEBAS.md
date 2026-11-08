@@ -270,3 +270,15 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Activar «Borrar datos al salir», iniciar sesión en una web → menú aA → «Salir y borrar datos»: Brisa se cierra y desaparece de Recientes. Al abrirla: sesión cerrada, sin historial ni pestañas.
 - [ ] Con el ajuste activado, salir a Inicio más de 5 minutos y volver: todo borrado. Con menos de 5 minutos, sigue igual.
 - [ ] Con el ajuste desactivado, el menú aA no muestra «Salir y borrar datos».
+
+## 28. Novedades 1.0.9 · enlaces a apps e issues #44–#51
+- [ ] En una búsqueda, tocar un enlace de youtube.com: pregunta «¿Abrir en YouTube?». «Abrir» va a la app; «Seguir en Brisa» lo carga aquí.
+- [ ] Un enlace de grupo de WhatsApp (chat.whatsapp.com/…) y uno de Telegram (t.me/…): ofrece abrir la app y, al aceptar, entra al grupo.
+- [ ] Escribir youtube.com en la barra: se queda en Brisa, sin preguntar. Navegar dentro de youtube.com: tampoco pregunta.
+- [ ] Desactivar «Preguntar antes»: los enlaces van a la app directamente (en privada sigue preguntando). Desactivar «Abrir enlaces en sus apps»: todo se queda en Brisa.
+- [ ] Enlace mailto: o tel: en una web: abre el correo o el teléfono.
+- [ ] Scroll en una página larga: fluido, la barra se encoge y vuelve igual que antes. Estirar para recargar sigue funcionando.
+- [ ] Web de noticias con aviso de cookies: se rechaza solo, igual que antes.
+- [ ] «Borrar datos al salir» activado: compartir una página a otra app y quedarse 6 minutos: al volver, todo borrado.
+- [ ] Mismo caso, pero volviendo con un enlace desde Telegram: Brisa abre ese enlace (con lo demás borrado).
+- [ ] «Entrar con Google» en ventana emergente: se abre y se cierra sola al terminar.

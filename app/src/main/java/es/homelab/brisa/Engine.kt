@@ -160,7 +160,17 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
      *  hayan retirado los «Solo esta vez» de la vez anterior (#40). */
     fun wake() { ensureOpen(); pending?.let { pending = null; Permissions.whenReady(it) } }
     /** Las pestañas restauradas no abren su sesión hasta que se ven: con 30 pestañas el arranque es como con 1. */
-    fun ensureOpen() { if (!session.isOpen) session.open(Engine.get(ctx)) }
+    fun ensureOpen() { if (!session.isOpen && !byGecko) session.open(Engine.get(ctx)) }
+    /** Ventanas de window.open: la sesión la abre Gecko, no Brisa (#45). Si en 1 s no lo ha hecho, la abre Brisa. */
+    private val geckoOpens = !openNow && !lazy
+    private val byGecko get() = geckoOpens && openedByGeckoPending
+    private var openedByGeckoPending = true
+    suspend fun awaitOpen() {
+        if (session.isOpen || !geckoOpens) { ensureOpen(); return }
+        kotlinx.coroutines.withTimeoutOrNull(1000) { while (!session.isOpen) kotlinx.coroutines.delay(16) }
+        openedByGeckoPending = false
+        ensureOpen()
+    }
     /** Pausar/reanudar sin tocar sesiones que aún no se han abierto. */
     fun active(on: Boolean) { if (session.isOpen) session.setActive(on) }
     /** Pestaña que la abrió con window.open (para volver a ella al cerrarse, #38). */
@@ -197,7 +207,9 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var reading by mutableStateOf(false)
     private var port: WebExtension.Port? = null
     /** Desplazamiento acumulado: la barra se encoge al bajar y vuelve al subir. */
-    var scrollDelta by mutableIntStateOf(0)
+    /** Barras encogidas por el scroll. Solo cambia al cambiar de sentido, no en cada evento (#47). */
+    var barsHidden by mutableStateOf(false)
+    private var lastGesture = 0L
 
     val session: GeckoSession = ((if (!private && openNow) Engine.takeSpare(ctx) else null) ?: GeckoSession(
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
@@ -233,8 +245,13 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onCanGoBack(s: GeckoSession, v: Boolean) { canBack = v }
             // Mientras otra pestaña tiene «Continuar sin seguridad», esta no puede abrir webs http (se retienen)
-            override fun onLoadRequest(s: GeckoSession, req: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? =
-                if (Privacy.holdDuringInsecure(s, req.uri)) GeckoResult.fromValue(AllowOrDeny.DENY) else null
+            override fun onLoadRequest(s: GeckoSession, req: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
+                if (Privacy.holdDuringInsecure(s, req.uri)) return GeckoResult.fromValue(AllowOrDeny.DENY)
+                // Toque del usuario ahora o hace muy poco (las webs suelen redirigir a la app tras el toque)
+                val now = System.currentTimeMillis()
+                if (req.hasUserGesture) lastGesture = now
+                return ExternalApps.check(ctx, this@Tab, req, gesture = now - lastGesture < 4000)
+            }
             // Gecko nos da el permiso de «rastreo» de cada web: sirve para el escudo por web.
             override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
                 // Permisos de «Solo esta vez»: se retiran al irse a otra web (#24)
@@ -271,8 +288,10 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         scrollDelegate = object : GeckoSession.ScrollDelegate {
             var last = 0
             override fun onScrollChanged(s: GeckoSession, x: Int, y: Int) {
-                scrollDelta = (y - last).coerceIn(-50, 50).let { d -> if (y < 40) -100 else d }
+                val d = if (y < 40) -100 else y - last
                 last = y
+                val hide = when { d > 8 -> true; d < -8 -> false; else -> return }
+                if (hide != barsHidden) barsHidden = hide
             }
         }
         // Tablet: las webs se piden en versión de escritorio (la pantalla ya es ancha, así que el viewport sigue siendo el del dispositivo)
@@ -372,7 +391,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             if (crashes <= 2) { if (st != null) session.restoreState(st) else if (u.isNotBlank()) session.loadUri(u) }
         }
         if (reopen && this !== visible) { pending = go; return }
-        if (this === visible) {
+        // Con Brisa en segundo plano no se recarga nada (Android está liberando memoria): se hará al volver (#44)
+        if (this === visible && foreground) {
             go()
             android.widget.Toast.makeText(ctx, if (crashes <= 2) "Esta pestaña se había cerrado. Recargada." else "Esta pestaña se cierra una y otra vez: no se ha recargado.", android.widget.Toast.LENGTH_SHORT).show()
         } else pending = go
@@ -387,6 +407,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     }
 
     companion object {
+        /** Brisa está delante (entre onResume y onPause). */
+        var foreground = false
         var tabHost: TabHost? = null
         /** Pestaña que se está viendo (para saber el esquema y puerto de la página al rellenar contraseñas). */
         @Volatile var visible: Tab? = null

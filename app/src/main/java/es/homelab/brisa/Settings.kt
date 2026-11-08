@@ -33,8 +33,17 @@ object Settings {
         private set
     fun changePullRefresh(ctx: Context, v: Boolean) { pullRefresh = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("estirar_recargar", v).apply() }
 
+    /** Abrir enlaces en sus apps (YouTube, WhatsApp, Telegram…) y si se pregunta antes. */
+    var openApps by mutableStateOf(true)
+        private set
+    var askApps by mutableStateOf(true)
+        private set
+    fun changeOpenApps(ctx: Context, v: Boolean) { openApps = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("abrir_apps", v).apply() }
+    fun changeAskApps(ctx: Context, v: Boolean) { askApps = v; ctx.getSharedPreferences("ajustes", 0).edit().putBoolean("preguntar_apps", v).apply() }
+
     fun load(ctx: Context) {
         val p = ctx.getSharedPreferences("ajustes", 0)
+        openApps = p.getBoolean("abrir_apps", true); askApps = p.getBoolean("preguntar_apps", true)
         pullRefresh = p.getBoolean("estirar_recargar", true)
         isTablet = ctx.resources.configuration.smallestScreenWidthDp >= 600
         desktopTablet = p.getBoolean("escritorio_tablet", true)

@@ -1,7 +1,13 @@
 // Rechaza los avisos de cookies de los gestores más comunes (OneTrust, Didomi, Cookiebot, Quantcast,
 // Sourcepoint, Usercentrics, CookieYes, Complianz, iubenda…). Solo pulsa botones de «rechazar»;
 // si no encuentra ninguno, no toca nada.
+// Ligero (#48): como mucho una búsqueda cada 400 ms, solo 6 s, sin forzar maquetación y, en iframes,
+// solo en los de consentimiento.
 (async function () {
+  const CONSENT_FRAME = window.top !== window &&
+    /privacy-mgmt|sourcepoint|consensu|didomi|cmp|consent|cookie/i.test(location.hostname + location.pathname);
+  // Iframes normales (anuncios, vídeos…): nada que hacer
+  if (window.top !== window && !CONSENT_FRAME) return;
   try {
     const { cookies } = await browser.storage.local.get("cookies");
     if (cookies === false) return;
@@ -20,36 +26,46 @@
     ".fc-cta-do-not-consent", "#tarteaucitronAllDenied2", ".t-declineButton", "[data-cookiefirst-action='reject']"
   ];
   const TEXT = /^(rechazar( todo| todas| todas las cookies)?|no aceptar|denegar|solo (las )?necesarias|reject( all)?|decline( all)?|refuse( all)?|only necessary|necessary only)$/i;
-  const CONSENT_FRAME = window.top !== window &&
-    /privacy-mgmt|sourcepoint|consensu|didomi|cmp|consent|cookie/i.test(location.hostname + location.pathname);
-  const AREA = /cookie|consent|gdpr|cmp|privacy|privacidad|didomi|onetrust|sp_message|banner/i;
+  // Contenedores que parecen un aviso de cookies (por id o clase)
+  const AREA_SEL = ["cookie", "consent", "gdpr", "cmp", "privacy", "privacidad", "didomi", "onetrust", "sp_message", "banner"]
+    .map(w => `[id*='${w}' i], [class*='${w}' i]`).join(", ");
+  const BUTTONS = "button, a[role='button'], [role='button']";
+  const visible = b => b.getClientRects().length > 0;
 
-  function find() {
-    for (const s of SELECTORS) {
-      const b = document.querySelector(s);
-      if (b && b.offsetParent !== null) return b;
-    }
-    // Botones con texto de rechazo dentro de un aviso de cookies
-    for (const b of document.querySelectorAll("button, a[role='button'], [role='button']")) {
-      const t = (b.innerText || b.textContent || "").trim();
-      if (t.length > 40 || !TEXT.test(t) || b.offsetParent === null) continue;
-      let p = b, ok = false;
-      for (let i = 0; i < 8 && p; i++, p = p.parentElement) {
-        if (AREA.test((p.id || "") + " " + (p.className && p.className.baseVal === undefined ? p.className : ""))) { ok = true; break; }
-      }
-      if (ok || CONSENT_FRAME) return b;   // en iframes de consentimiento (Sourcepoint…) basta con el texto
+  function byText(root) {
+    for (const b of root.querySelectorAll(BUTTONS)) {
+      const t = (b.textContent || "").trim();   // textContent: no obliga a recalcular la maquetación
+      if (t.length <= 40 && TEXT.test(t) && visible(b)) return b;
     }
     return null;
   }
 
-  let done = false;
+  function find() {
+    // 1) Selectores conocidos: baratos
+    for (const s of SELECTORS) {
+      const b = document.querySelector(s);
+      if (b && visible(b)) return b;
+    }
+    // 2) Por texto: en iframes de consentimiento, en todo el documento; si no, solo dentro de lo que parezca un aviso
+    if (CONSENT_FRAME) return byText(document);
+    const areas = document.querySelectorAll(AREA_SEL);
+    for (let i = 0; i < areas.length && i < 20; i++) {
+      const b = byText(areas[i]);
+      if (b) return b;
+    }
+    return null;
+  }
+
+  let done = false, timer = 0;
   const tryClick = () => {
+    timer = 0;
     if (done) return;
     const b = find();
     if (b) { done = true; b.click(); obs.disconnect(); }
   };
-  const obs = new MutationObserver(tryClick);
+  // Agrupa los cambios: como mucho una búsqueda cada 400 ms
+  const obs = new MutationObserver(() => { if (!timer && !done) timer = setTimeout(tryClick, 400); });
   obs.observe(document.documentElement, { childList: true, subtree: true });
   tryClick();
-  setTimeout(() => obs.disconnect(), 12000);
+  setTimeout(() => { obs.disconnect(); if (timer) clearTimeout(timer); }, 6000);
 })();

@@ -86,6 +86,20 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 }
                 Switch(Settings.pullRefresh, { Settings.changePullRefresh(ctx, it) })
             }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Abrir enlaces en sus apps")
+                    Text("YouTube, WhatsApp, Telegram, Maps… al tocar un enlace desde otra web", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(Settings.openApps, { Settings.changeOpenApps(ctx, it) })
+            }
+            if (Settings.openApps) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Preguntar antes de abrir la app")
+                    Text("En las pestañas privadas siempre se pregunta", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(Settings.askApps, { Settings.changeAskApps(ctx, it) })
+            }
             if (Settings.isTablet) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Webs de escritorio en la tablet")
@@ -275,7 +289,7 @@ fun PrivacySection() {
     toggle("Vídeo protegido (DRM)", "Para Netflix, Prime Video y similares. Apágalo si prefieres no usar el módulo de DRM", Privacy.drm, "drm")
     toggle("Preguntar antes de descargar", "Ninguna web puede descargarte un archivo sin que lo confirmes", Privacy.askDownloads, "preguntar_descargas")
     toggle("Bloquear pestañas privadas", "Al volver a Brisa, piden huella o PIN para verlas", Privacy.lockPrivate, "bloquear_privadas")
-    toggle("Borrar datos al salir", "Se borran historial, cookies, caché y pestañas (cerrarás sesión en las webs) al pulsar «Salir y borrar datos» en el menú aA, al quitar Brisa de Recientes o tras 5 minutos fuera de ella", Privacy.clearOnExit, "borrar_salir")
+    toggle("Borrar datos al salir", "Se borran historial, cookies, caché y pestañas (cerrarás sesión en las webs) al pulsar «Salir y borrar datos» en el menú aA, al quitar Brisa de Recientes o a los 5 minutos de salir de ella", Privacy.clearOnExit, "borrar_salir")
 
     OutlinedButton({ showPerms = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Permisos por web") }
     if (showPerms) SitePermissionsSheet { showPerms = false }
