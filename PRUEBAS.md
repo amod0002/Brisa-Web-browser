@@ -282,3 +282,9 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] «Borrar datos al salir» activado: compartir una página a otra app y quedarse 6 minutos: al volver, todo borrado.
 - [ ] Mismo caso, pero volviendo con un enlace desde Telegram: Brisa abre ese enlace (con lo demás borrado).
 - [ ] «Entrar con Google» en ventana emergente: se abre y se cierra sola al terminar.
+
+## 29. Novedades 1.0.10 · issues #53 y #54
+- [ ] Cambiar de pestaña muchas veces (desde la cuadrícula, deslizando la barra y con atajos de teclado): nunca aparece un menú de enlace que no se haya pedido.
+- [ ] Desde otra app (feed de Google, Telegram) abrir varias noticias seguidas en Brisa: no sale ningún menú de enlace de la pestaña anterior.
+- [ ] Mantener pulsado un enlace sigue sacando su menú, con el enlace correcto (también en privada).
+- [ ] Abrir 4 pestañas, pasar por todas con la cuadrícula, salir de Brisa 10 minutos y volver: las 4 conservan su miniatura.
