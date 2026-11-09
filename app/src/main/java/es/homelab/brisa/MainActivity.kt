@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         val i = tabs.indexOf(tab); if (i < 0) return
         current = i; ui.closeGrid++
     }
-    /** Poca memoria: fuera las miniaturas de las pestañas que no se ven (se vuelven a hacer al abrir la cuadrícula). */
     /** «Salir y borrar datos» (#43): borra todo y cierra Brisa de verdad, también de Recientes. */
     fun quitAndWipe() {
         wipeTabs()
@@ -85,13 +84,23 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         tabs += Tab(this, false, null); current = 0
     }
 
+    /**
+     * Poca memoria DE VERDAD: fuera las miniaturas de las pestañas que no se ven (se vuelven a hacer al abrir
+     * la cuadrícula). Solo con falta de memoria con Brisa delante o en el extremo; NO con UI_HIDDEN,
+     * BACKGROUND ni MODERATE, que llegan cada vez que Brisa pasa al fondo y dejaban la cuadrícula en gris (#54).
+     */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         @Suppress("DEPRECATION")
-        if (level != android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
-            tabs.forEachIndexed { i, t -> if (i != current) t.thumb = null }
+        val low = level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+        if (low) tabs.forEachIndexed { i, t -> if (i != current) t.thumb = null }
     }
-    override fun contextMenu(tab: Tab, e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement) { ui.context = tab to e }
+    /** Solo el menú de la pestaña que se está viendo: uno de otra pestaña es un toque a medias que Gecko tomó por pulsación larga (#53). */
+    override fun contextMenu(tab: Tab, e: org.mozilla.geckoview.GeckoSession.ContentDelegate.ContextElement) {
+        if (tab === Tab.visible) ui.context = tab to e
+    }
     override fun fullScreen(on: Boolean) {
         ui.fullScreen = on
         val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
@@ -360,9 +369,11 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     }
 
     LaunchedEffect(tab) {
+        // #53: se cierra el toque a medias de la pestaña que se deja y su menú de enlace, si había uno
+        geckoView.cancelTouch(); ui.context = null
         tab.awaitOpen() // antes de dársela a la vista: si no, GeckoView abriría la sesión con otro motor
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
-        Tab.visible = tab
+        Tab.visible = tab; ui.context = null
         if (!(tab.private && ui.privateLocked)) { tab.active(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
         tabs.forEach { if (it !== tab) it.active(false) }

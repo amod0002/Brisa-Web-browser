@@ -2,6 +2,10 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.10 · menú de enlace fantasma y miniaturas que se quedan (issues #53 y #54, gracias @perritys)
+- **Menú de enlace de otra pestaña** (#53): al cambiar de pestaña o volver a Brisa desde otra app ya no aparece el menú «Abrir en pestaña nueva / Copiar / Compartir» de un enlace de la pestaña anterior. Se cierra el toque a medias antes de cambiar de pestaña y solo se muestran menús de la pestaña que se está viendo.
+- **Miniaturas de la cuadrícula** (#54): ya no se borran cada vez que Brisa pasa al fondo; solo cuando Android avisa de que falta memoria de verdad.
+
 ## 1.0.9 · enlaces que se abren en su app y más fluidez (issues #44–#51)
 - **Abrir en la app**: los enlaces de YouTube, WhatsApp, Telegram, Maps… tocados desde otra web ofrecen «¿Abrir en YouTube?». También funcionan los enlaces `tg://`, `whatsapp://`, `intent://`, `mailto:`, `tel:`… (antes daban error). Ajustes: «Abrir enlaces en sus apps» y «Preguntar antes» (en privadas siempre pregunta).
 - **Fluidez** (#47): el scroll y la carga ya no recomponen toda la interfaz; solo las barras cuando cambian.
