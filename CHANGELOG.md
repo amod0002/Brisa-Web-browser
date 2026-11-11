@@ -2,6 +2,12 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.0.11 · Gecko 160, miniaturas guardadas, sin parpadeo y cambios de red (issues #55, #57, #58, #59, gracias @perritys)
+- **Motor Gecko 160** (#57): con los últimos parches de seguridad de Mozilla.
+- **Miniaturas** (#58): se guardan reducidas en disco (solo las de pestañas normales, nunca las privadas), así que siguen ahí aunque Android cierre Brisa. Se hacen también al cambiar de pestaña y al salir, y no se guardan en blanco si la página aún no ha pintado o se está recargando.
+- **Sin parpadeo** (#55): al abrir un enlace desde otra app ya no se ve la pestaña anterior; fondo neutro con la barra de progreso hasta que la página pinta.
+- **Cambios de red** (#59): al quitar la VPN o pasar de Wi-Fi a datos, Brisa avisa a Gecko para que tire las conexiones muertas y reinicia el DNS cifrado. Si aun así se atasca, el menú aA tiene **«Reiniciar Brisa»**, que conserva las pestañas.
+
 ## 1.0.10 · menú de enlace fantasma y miniaturas que se quedan (issues #53 y #54, gracias @perritys)
 - **Menú de enlace de otra pestaña** (#53): al cambiar de pestaña o volver a Brisa desde otra app ya no aparece el menú «Abrir en pestaña nueva / Copiar / Compartir» de un enlace de la pestaña anterior. Se cierra el toque a medias antes de cambiar de pestaña y solo se muestran menús de la pestaña que se está viendo.
 - **Miniaturas de la cuadrícula** (#54): ya no se borran cada vez que Brisa pasa al fondo; solo cuando Android avisa de que falta memoria de verdad.

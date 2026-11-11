@@ -122,6 +122,11 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
             ListItem(leadingContent = { Icon(Icons.Outlined.Settings, null) },
                 headlineContent = { Text("Ajustes") },
                 modifier = Modifier.clickable { dismiss(); openSettings() })
+            // #59: si tras un cambio de red (p. ej. quitar la VPN) no carga nada, reinicia sin ir a los ajustes de Android
+            ListItem(leadingContent = { Icon(Icons.Outlined.RestartAlt, null) },
+                headlineContent = { Text("Reiniciar Brisa") },
+                supportingContent = { Text("Si las webs dejan de cargar tras cambiar de red" + if (Privacy.clearOnExit) "" else ". Conserva tus pestañas") },
+                modifier = Modifier.clickable { dismiss(); (ctx as? MainActivity)?.restart() })
             // #43: «atrás» no cierra Brisa (la manda al fondo), así que salir de verdad y borrar es un botón
             if (Privacy.clearOnExit) ListItem(leadingContent = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = MaterialTheme.colorScheme.error) },
                 headlineContent = { Text("Salir y borrar datos", color = MaterialTheme.colorScheme.error) },

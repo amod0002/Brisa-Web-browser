@@ -1,0 +1,8 @@
+[
+  {
+    "namespace": "brisaNet",
+    "functions": [
+      { "name": "linkChanged", "type": "function", "async": true, "parameters": [] }
+    ]
+  }
+]

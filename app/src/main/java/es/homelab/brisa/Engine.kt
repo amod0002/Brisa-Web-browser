@@ -52,6 +52,10 @@ object Engine {
             .accept({ ext -> if (ext != null) { builtIn = ext; Privacy.attach(ext); waiting.forEach { it(ext) }; waiting.clear() } }, { })
         Privacy.load(ctx)
         Privacy.apply(ctx)
+        // #59: extensión aparte para avisar a Gecko de los cambios de red. Si no carga, solo falla ella.
+        rt.webExtensionController.ensureBuiltIn("resource://android/assets/extensions/brisanet/", "red@homelab.es")
+            .accept({ ext -> if (ext != null) NetWatch.attach(ext) }, { e -> android.util.Log.w("Brisa", "brisanet", e) })
+        NetWatch.start(ctx.applicationContext)
         // Las extensiones las instala el usuario desde el menú «aA»: se aceptan sin más diálogos.
         rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
@@ -153,7 +157,11 @@ interface TabHost {
  * [openNow] = false cuando Gecko nos pide una sesión para un enlace «abrir en ventana nueva»: él la abre.
  */
 class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null,
-          lazy: Boolean = false) {
+          lazy: Boolean = false, id: String? = null) {
+    /** Id estable (se guarda en pestanas.json): nombre de su miniatura en disco (#58). */
+    val id: String = id ?: java.util.UUID.randomUUID().toString()
+    /** La página ya ha pintado algo: hasta entonces se tapa la vista para no ver la pestaña anterior (#55). */
+    var painted by mutableStateOf(false)
     /** Pestaña restaurada que aún no se ha cargado: se carga la primera vez que se muestra. */
     private var pending: (() -> Unit)? = null
     /** Se muestra por primera vez: abre su sesión en el motor (#36) y carga la página. Antes se espera a que se
@@ -217,7 +225,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
-            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; Privacy.restoreAfterLoad(ctx, s) }
+            override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; if (!isHome) painted = true; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { lastState = st; if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
@@ -228,6 +236,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
                 if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }
+            override fun onFirstContentfulPaint(s: GeckoSession) { painted = true }
             override fun onFullScreen(s: GeckoSession, on: Boolean) { tabHost?.fullScreen(on) }
             override fun onCloseRequest(s: GeckoSession) { tabHost?.closeTab(this@Tab) }
             override fun onFocusRequest(s: GeckoSession) { tabHost?.focusTab(this@Tab) }
@@ -377,13 +386,17 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     private var lastFind = ""
     fun endFind() { session.finder.clear(); findText = null; findResult = ""; lastFind = "" }
 
-    fun close() { Permissions.leaveSite(ctx, session, null); thumb = null; opener = null; if (session.isOpen) session.close() }
+    fun close() {
+        Permissions.leaveSite(ctx, session, null); thumb = null; opener = null; if (session.isOpen) session.close()
+        if (!private) Thumbs.delete(ctx, id)
+    }
 
     /** Recuperar la pestaña tras caerse su proceso. Si no es la visible, se recarga cuando se vuelva a mirar. */
     private fun recover(reopen: Boolean) {
         val now = System.currentTimeMillis()
         crashes = if (now - lastCrash < 15_000) crashes + 1 else 1
         lastCrash = now
+        painted = false
         val st = lastState; val u = url
         val go = {
             if (!session.isOpen) session.open(Engine.get(ctx))
@@ -404,6 +417,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         val small = runCatching { Bitmap.createScaledBitmap(b, (b.width / 3).coerceAtLeast(1), (b.height / 3).coerceAtLeast(1), true) }.getOrNull() ?: return
         if (small !== b) b.recycle()
         thumb = small
+        // En disco solo las normales, nunca las privadas (#58)
+        if (!private) Thumbs.save(ctx, id, small)
     }
 
     companion object {
