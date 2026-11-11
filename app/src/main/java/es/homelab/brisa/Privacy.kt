@@ -119,6 +119,16 @@ object Privacy {
         pushToExtension()
     }
 
+    /**
+     * La red ha cambiado (#59): se apaga el DNS cifrado y se vuelve a encender. Gecko vacía así su caché de
+     * DNS cifrado y no sigue esperando respuestas por la conexión de antes (p. ej. la que iba por la VPN).
+     */
+    fun resetDns(ctx: Context) {
+        if (dohMode == 0 || insecureOnce) return
+        Engine.get(ctx).settings.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_DISABLED)
+        main.postDelayed({ if (!insecureOnce) apply(ctx) }, 300)
+    }
+
     // ---- Extensión: banners de cookies y WebRTC -------------------------------------------------
     private var bgPort: WebExtension.Port? = null
 
@@ -152,6 +162,7 @@ object Privacy {
         WebIcons.clear(ctx)
         Report.clear()
         Downloads.load(ctx); Downloads.clear(ctx)
+        Thumbs.clear(ctx)
         rt.storageController.clearData(StorageController.ClearFlags.ALL).accept({ done() }, { done() })
     }
 

@@ -288,3 +288,14 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Desde otra app (feed de Google, Telegram) abrir varias noticias seguidas en Brisa: no sale ningún menú de enlace de la pestaña anterior.
 - [ ] Mantener pulsado un enlace sigue sacando su menú, con el enlace correcto (también en privada).
 - [ ] Abrir 4 pestañas, pasar por todas con la cuadrícula, salir de Brisa 10 minutos y volver: las 4 conservan su miniatura.
+
+## 30. Novedades 1.0.11 · Gecko 160 e issues #55, #58, #59
+- [ ] Repaso rápido de Gecko 160: instalar encima de la 1.0.10 conservando datos, uBlock activo, YouTube, Maps, un login del homelab, una descarga y modo lectura.
+- [ ] Con Brisa en segundo plano mostrando Inicio u otra web, abrir un enlace desde Telegram: no se ve la pantalla anterior; fondo neutro con la barra de progreso y después la página.
+- [ ] Cambiar entre pestañas ya cargadas: no hay parpadeos nuevos.
+- [ ] Abrir 4 pestañas y pasar por todas, cerrar Brisa desde Recientes y volver a abrirla: las 4 tienen miniatura.
+- [ ] Abrir la cuadrícula mientras la pestaña actual recarga: conserva la miniatura anterior, no sale en blanco.
+- [ ] Una pestaña privada: con Brisa cerrada y reabierta no queda ninguna miniatura suya (ni la pestaña).
+- [ ] Navegar con la VPN, desconectarla y seguir navegando: las páginas cargan en pocos segundos sin forzar la detención (con el DNS cifrado en «Automático» y en «Estricto» con tu DoH propio).
+- [ ] Pasar de Wi-Fi a datos y al revés: sigue cargando.
+- [ ] Menú aA → «Reiniciar Brisa»: se cierra y vuelve a abrirse sola con las mismas pestañas.

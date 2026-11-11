@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Brisa red",
+  "version": "1.0",
+  "description": "Avisa a Gecko de que la red ha cambiado (issue #59).",
+  "browser_specific_settings": { "gecko": { "id": "red@homelab.es" } },
+  "background": { "scripts": ["background.js"] },
+  "permissions": ["nativeMessaging"],
+  "experiment_apis": {
+    "brisaNet": {
+      "schema": "schema.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "script": "api.js",
+        "paths": [["brisaNet"]]
+      }
+    }
+  }
+}

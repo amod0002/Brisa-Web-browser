@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -188,9 +189,12 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
             val a = org.json.JSONArray(tabsFile.readText())
             for (i in 0 until a.length()) a.getJSONObject(i).let {
                 tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null },
-                    group = it.optString("group").ifEmpty { null }, lazy = true)
+                    group = it.optString("group").ifEmpty { null }, lazy = true, id = it.optString("id").ifEmpty { null })
+                    // Su miniatura de la última vez, del disco (#58)
+                    .also { t -> Thumbs.load(this, t.id) { b -> if (t.thumb == null) t.thumb = b } }
             }
         }
+        Thumbs.prune(this, tabs.map { it.id }.toSet())
         val incoming = intent?.dataString?.let(::safeIncoming) ?: fromNotification(intent)
         if (incoming != null) tabs += Tab(this, false, incoming)
         if (tabs.isEmpty()) tabs += Tab(this, false, null)
@@ -296,12 +300,31 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     override fun onPause() {
         super.onPause()
         Tab.foreground = false
+        ui.captureNow?.invoke() // miniatura de la pestaña que se ve, por si Android cierra Brisa (#58)
         tabs.forEach { it.active(false) }
+        saveTabs()
+    }
+
+    private fun saveTabs() {
         val a = org.json.JSONArray()
         tabs.filter { !it.private && !it.isHome }.forEach {
-            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: ""))
+            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: "").put("id", it.id))
         }
         if (!Privacy.clearOnExit) runCatching { tabsFile.writeText(a.toString()) }
+    }
+
+    /**
+     * «Reiniciar Brisa» (#59): guarda las pestañas y reinicia la app entera, también los procesos de Gecko.
+     * Es lo mismo que forzar la detención en los ajustes de Android, pero sin salir de Brisa ni perder nada.
+     */
+    fun restart() {
+        saveTabs(); Report.save()
+        startActivity(Intent.makeRestartActivityTask(android.content.ComponentName(this, MainActivity::class.java)))
+        val me = android.os.Process.myPid()
+        getSystemService(android.app.ActivityManager::class.java)?.runningAppProcesses?.forEach {
+            if (it.uid == android.os.Process.myUid() && it.pid != me) android.os.Process.killProcess(it.pid)
+        }
+        Runtime.getRuntime().exit(0)
     }
 }
 
@@ -323,6 +346,8 @@ class UiState {
     var closeGrid by mutableIntStateOf(0)
     /** Atajos de teclado: los recibe la actividad y los resuelve la pantalla. */
     var shortcut: ((String) -> Boolean)? = null
+    /** Guardar ya la miniatura de la pestaña que se ve (al salir de Brisa, #58). */
+    var captureNow: (() -> Unit)? = null
     /** Centro del botón de descargas (para la animación del icono que vuela hasta él). */
     var downloadTarget by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
     fun unlockPrivate(ctx: android.content.Context) {
@@ -348,6 +373,23 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
     }
     val favs = remember { Favorites(ctx) }
+    val scope = rememberCoroutineScope()
+    /** Pestaña cuya sesión tiene ahora la vista (cambia en LaunchedEffect(tab), después de que cambie tab). */
+    val attached = remember { arrayOfNulls<Tab>(1) }
+    /**
+     * Miniatura de [t], que tiene que ser la que está en la vista. No se hace si aún no ha pintado nada o
+     * se está recargando (saldría en blanco): mejor quedarse con la anterior (#58).
+     */
+    suspend fun capture(t: Tab) {
+        if (attached[0] !== t || t.isHome || !t.painted || t.progress < 50 || (t.private && ui.privateLocked) || !t.session.isOpen) return
+        val b = kotlinx.coroutines.withTimeoutOrNull(300) {
+            kotlinx.coroutines.suspendCancellableCoroutine<android.graphics.Bitmap?> { c ->
+                geckoView.capturePixels().accept({ if (c.isActive) c.resumeWith(Result.success(it)) }, { if (c.isActive) c.resumeWith(Result.success(null)) })
+            }
+        }
+        t.saveThumb(b)
+    }
+    SideEffect { ui.captureNow = { scope.launch { capture(tab) } } }
     // Estirar para recargar
     val density = androidx.compose.ui.platform.LocalDensity.current
     var pull by remember { mutableFloatStateOf(0f) }
@@ -371,8 +413,11 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
     LaunchedEffect(tab) {
         // #53: se cierra el toque a medias de la pestaña que se deja y su menú de enlace, si había uno
         geckoView.cancelTouch(); ui.context = null
+        // #58: miniatura de la pestaña que se deja, antes de quitarle la vista
+        attached[0]?.let { if (it !== tab) capture(it) }
         tab.awaitOpen() // antes de dársela a la vista: si no, GeckoView abriría la sesión con otro motor
         geckoView.releaseSession(); geckoView.setSession(tab.session); collapsed = false
+        attached[0] = tab
         Tab.visible = tab; ui.context = null
         if (!(tab.private && ui.privateLocked)) { tab.active(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
@@ -455,7 +500,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             }
             else if (wide && !ui.fullScreen) {
                 TabletToolbar(tab, tabs.size, favs, editing, { editing = it }, onMenu = { showMenu = true },
-                    onTabs = { showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) },
+                    onTabs = { showTabs = true; scope.launch { capture(tab) } },
                     onNewTab = { newTab(tab.private) }, ui = ui, onDownloads = { showDownloads = true })
                 if (tab.findText != null) Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.widthIn(max = 640.dp)) { FindBar(tab) }
@@ -466,6 +511,11 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                     // El contenedor de Compose no debe ocultar la web al autorrelleno de Android
                     (v.parent as? android.view.View)?.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
                 })
+                // #55: pestaña que aún no ha pintado nada (p. ej. un enlace que llega de otra app): fondo neutro
+                // en vez del último fotograma de la pestaña anterior. Las que ya tenían contenido no se tapan.
+                if (!tab.isHome && !tab.painted) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+                    if (tab.progress < 100) LinearProgressIndicator({ tab.progress / 100f }, Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                }
                 if (tab.isHome) HomePage(favs, tab.private) { tab.open(it) }
                 if (tab.private && ui.privateLocked) PrivateLock { ui.unlockPrivate(ctx) }
                 // Indicador de «estirar para recargar»: arriba del contenido (en tablet, debajo de la barra)
@@ -518,7 +568,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                             Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
                         }
                         DownloadButton(ui) { showDownloads = true }
-                        IconButton({ showTabs = true; geckoView.capturePixels().accept({ tab.saveThumb(it) }, { }) }) {
+                        IconButton({ showTabs = true; scope.launch { capture(tab) } }) {
                             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                                 Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
