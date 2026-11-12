@@ -583,6 +583,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         if (showMenu) PageMenu(tab, { showMenu = false }, { newTab(private = true) }, { showHistory = true }, { showSettings = true }, { showDownloads = true },
             openTab = { u -> tabs.add(current + 1, Tab(ctx, tab.private, u)); select(current + 1) })
         if (showDownloads) DownloadsSheet { showDownloads = false }
+        // #16: ventanita de una extensión (su botón en el menú «aA»)
+        Extensions.popup?.let { p -> key(p) { ExtensionPopupSheet(p) } }
         ui.dialogs.toList().forEach { d -> key(d) { d { ui.dialogs.remove(d) } } }
         ui.context?.let { (t, e) ->
             LinkSheet(e, dismiss = { ui.context = null },

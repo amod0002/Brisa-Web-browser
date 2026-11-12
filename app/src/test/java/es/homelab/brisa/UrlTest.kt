@@ -192,3 +192,19 @@ class PasswordFondoTest {
         assertEquals(false, ExternalApps.isExternal("content://com.whatsapp.provider/x"))
     }
 }
+
+/** #16: enlaces de extensiones que se pueden pegar para instalar. */
+class ExtensionLinkTest {
+    @Test fun fichaAmo() = assertEquals("https://addons.mozilla.org/firefox/downloads/latest/darkreader/latest.xpi",
+        Extensions.toInstallUrl("https://addons.mozilla.org/es-ES/android/addon/darkreader/"))
+    @Test fun fichaAmoSinIdioma() = assertEquals("https://addons.mozilla.org/firefox/downloads/latest/sponsorblock/latest.xpi",
+        Extensions.toInstallUrl("https://addons.mozilla.org/firefox/addon/sponsorblock/?utm_source=x"))
+    @Test fun xpiDirecto() = assertEquals("https://example.org/ext.xpi", Extensions.toInstallUrl(" https://example.org/ext.xpi "))
+    @Test fun noEsExtension() = org.junit.Assert.assertNull(Extensions.toInstallUrl("https://addons.mozilla.org/es-ES/android/"))
+    @Test fun sinHttps() = org.junit.Assert.assertNull(Extensions.toInstallUrl("http://example.org/ext.xpi"))
+    @Test fun respuestaXpi() {
+        org.junit.Assert.assertTrue(Extensions.isXpi("application/x-xpinstall", "https://addons.mozilla.org/firefox/downloads/file/1/a"))
+        org.junit.Assert.assertTrue(Extensions.isXpi(null, "https://addons.mozilla.org/firefox/downloads/file/1/a-1.0.xpi?src=x"))
+        org.junit.Assert.assertFalse(Extensions.isXpi("application/pdf", "https://example.org/a.pdf"))
+    }
+}

@@ -56,6 +56,8 @@ object Engine {
         rt.webExtensionController.ensureBuiltIn("resource://android/assets/extensions/brisanet/", "red@homelab.es")
             .accept({ ext -> if (ext != null) NetWatch.attach(ext) }, { e -> android.util.Log.w("Brisa", "brisanet", e) })
         NetWatch.start(ctx.applicationContext)
+        // #16: extensiones del usuario (botón, ventanita, pestañas propias y opciones)
+        Extensions.init(ctx, rt.webExtensionController)
         // Las extensiones las instala el usuario desde el menú «aA»: se aceptan sin más diálogos.
         rt.webExtensionController.promptDelegate = object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
@@ -232,7 +234,14 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onTitleChange(s: GeckoSession, t: String?) {
                 title = t ?: ""; if (!private) History.get(ctx).title(url, title)
             }
-            override fun onExternalResponse(s: GeckoSession, r: WebResponse) { Downloads.ask(ctx, r, url, private) }
+            override fun onExternalResponse(s: GeckoSession, r: WebResponse) {
+                // #16: un .xpi (el botón «Añadir» de addons.mozilla.org) se instala como extensión, no se descarga
+                if (Extensions.isXpi(r.headers["Content-Type"] ?: r.headers["content-type"], r.uri)) {
+                    runCatching { r.body?.close() }
+                    Extensions.installUrl(ctx, r.uri); return
+                }
+                Downloads.ask(ctx, r, url, private)
+            }
             override fun onContextMenu(s: GeckoSession, x: Int, y: Int, e: GeckoSession.ContentDelegate.ContextElement) {
                 if (e.linkUri != null || e.srcUri != null) tabHost?.contextMenu(this@Tab, e)
             }

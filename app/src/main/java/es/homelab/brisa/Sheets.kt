@@ -59,8 +59,6 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
              openTab: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     var size by remember { mutableFloatStateOf(Engine.textSize(ctx)) }
-    var ublock by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(Unit) { Engine.hasUblock(ctx) { ublock = it } }
     ModalBottomSheet(onDismissRequest = dismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             var showReport by remember { mutableStateOf(false) }
@@ -89,25 +87,14 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
                 headlineContent = { Text("Descargas") },
                 supportingContent = { Downloads.items.count { it.status == "Descargando" }.takeIf { it > 0 }?.let { Text("$it en curso") } },
                 modifier = Modifier.clickable { dismiss(); openDownloads() })
+            // #16: extensiones del usuario. Sus botones van aquí mismo; la lista completa, en su pantalla
+            var showExt by remember { mutableStateOf(false) }
             ListItem(leadingContent = { Icon(Icons.Outlined.Extension, null) },
-                headlineContent = { Text(when (ublock) { true -> "uBlock Origin activo"; null -> "Extensiones…"; else -> "Instalar uBlock Origin" }) },
-                supportingContent = { Text(if (ublock == true) "Ajustes, filtros y estadísticas" else "Bloqueador de anuncios") },
-                trailingContent = { if (ublock == true) Icon(Icons.AutoMirrored.Filled.OpenInNew, null, Modifier.size(18.dp)) },
-                modifier = Modifier.clickable(enabled = ublock != null) {
-                    if (ublock == true) {
-                        Engine.ublockOptions(ctx) { u ->
-                            if (u != null) { dismiss(); openTab(u) }
-                            else android.widget.Toast.makeText(ctx, "No se pudo abrir uBlock Origin", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                        return@clickable
-                    }
-                    ublock = null
-                    android.widget.Toast.makeText(ctx, "Instalando uBlock Origin…", android.widget.Toast.LENGTH_SHORT).show()
-                    Engine.installUblock(ctx) { ok ->
-                        ublock = ok
-                        android.widget.Toast.makeText(ctx, if (ok) "uBlock Origin instalado" else "No se pudo instalar uBlock Origin", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                })
+                headlineContent = { Text("Extensiones") },
+                supportingContent = { Text(Extensions.list.size.let { n -> when (n) { 0 -> "Instalar uBlock Origin, Bitwarden…"; 1 -> "1 instalada"; else -> "$n instaladas" } }) },
+                modifier = Modifier.clickable { showExt = true })
+            ExtensionActions(onAction = dismiss)
+            if (showExt) ExtensionsSheet({ showExt = false }) { u -> showExt = false; dismiss(); openTab(u) }
             ListItem(leadingContent = { Icon(Icons.Outlined.DesktopWindows, null) },
                 headlineContent = { Text(if (tab.desktop) "Versión móvil" else "Versión de escritorio") },
                 modifier = Modifier.clickable { tab.toggleDesktop(); dismiss() })
