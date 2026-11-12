@@ -29,6 +29,7 @@ La mayoría de navegadores de Android usan Chromium. Brisa usa **Gecko** (GeckoV
 - **Pestañas** en cuadrícula con miniaturas, **grupos** y pestañas **privadas** bloqueadas con huella o PIN.
 - **Inicio** con favoritos y webs visitadas con frecuencia.
 - **Modo lectura**, buscar en la página, tamaño del texto y vídeo a pantalla completa.
+- **Extensiones** (preliminar): instala las de addons.mozilla.org, con su botón y su ventanita en el menú «aA». Recomendadas: uBlock Origin, Bitwarden, Dark Reader y SponsorBlock; el resto, experimentales.
 - **Descargas** con animación, anillo de progreso y notificación. No se cortan al salir de la app.
 - **Tablet**: barra arriba, webs de escritorio por defecto y atajos de teclado (Ctrl+T, Ctrl+L, Ctrl+Tab…).
 - Tema claro y oscuro con Material You.

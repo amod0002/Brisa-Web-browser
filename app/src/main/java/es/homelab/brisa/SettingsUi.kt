@@ -132,6 +132,12 @@ fun SettingsSheet(dismiss: () -> Unit) {
                 Text("Ofrecer guardar contraseñas", Modifier.weight(1f))
                 Switch(Passwords.offerSave, { Passwords.changeOfferSave(it) })
             }
+            Text("Extensiones", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            var showExt by remember { mutableStateOf(false) }
+            OutlinedButton({ showExt = true }, Modifier.fillMaxWidth()) {
+                Text(if (Extensions.list.isEmpty()) "Extensiones" else "Extensiones (${Extensions.list.size})")
+            }
+            if (showExt) ExtensionsSheet({ showExt = false }) { u -> showExt = false; dismiss(); Tab.tabHost?.openTab(Tab(ctx, false, u)) }
             PrivacySection()
             Text("Privacidad", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             OutlinedButton({ Engine.clearData(ctx) { cleared = true } }, Modifier.fillMaxWidth()) {

@@ -2,6 +2,12 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.0 · extensiones (issue #16, gracias @perritys)
+- **Instalar extensiones**: desde addons.mozilla.org dentro de Brisa (el botón «Añadir a Firefox» funciona) o pegando el enlace de la extensión. Solo extensiones firmadas por Mozilla, y antes de instalar se enseñan sus permisos.
+- **Pantalla de extensiones** (menú aA y Ajustes): activar, desactivar, permitir en pestañas privadas, opciones y desinstalar.
+- **Su botón y su ventanita**: las extensiones con botón salen en el menú aA; al tocarlo se abre su ventanita o hacen su acción. También pueden abrir pestañas propias y su página de opciones.
+- **Recomendadas**: uBlock Origin, Bitwarden, Dark Reader y SponsorBlock, que se instalan con un toque. El resto sale como «experimental».
+
 ## 1.0.11 · Gecko 160, miniaturas guardadas, sin parpadeo y cambios de red (issues #55, #57, #58, #59, gracias @perritys)
 - **Motor Gecko 160** (#57): con los últimos parches de seguridad de Mozilla.
 - **Miniaturas** (#58): se guardan reducidas en disco (solo las de pestañas normales, nunca las privadas), así que siguen ahí aunque Android cierre Brisa. Se hacen también al cambiar de pestaña y al salir, y no se guardan en blanco si la página aún no ha pintado o se está recargando.

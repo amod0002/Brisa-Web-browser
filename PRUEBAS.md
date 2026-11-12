@@ -299,3 +299,15 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Navegar con la VPN, desconectarla y seguir navegando: las páginas cargan en pocos segundos sin forzar la detención (con el DNS cifrado en «Automático» y en «Estricto» con tu DoH propio).
 - [ ] Pasar de Wi-Fi a datos y al revés: sigue cargando.
 - [ ] Menú aA → «Reiniciar Brisa»: se cierra y vuelve a abrirse sola con las mismas pestañas.
+
+## 31. Novedades 1.1.0 · extensiones (issue #16)
+- [ ] Menú aA → Extensiones: uBlock Origin sale como instalada y «Recomendada». Su botón aparece en el menú aA y abre su ventanita (con el interruptor de la web actual).
+- [ ] Instalar Bitwarden desde «Recomendadas»: enseña los permisos antes de instalar. Su botón abre su ventanita; iniciar sesión (también con un Vaultwarden del homelab) y rellenar un formulario.
+- [ ] Dark Reader: su botón abre su ventanita y el modo oscuro se aplica a las webs.
+- [ ] SponsorBlock: en YouTube salta los patrocinios. Su página de bienvenida se abre como pestaña.
+- [ ] «Buscar en addons.mozilla.org» → una extensión cualquiera → «Añadir a Firefox»: pregunta los permisos y se instala, marcada como «Experimental».
+- [ ] Pegar el enlace de la ficha de una extensión y pulsar «Instalar»: se instala. Un enlace que no es de extensión da un aviso claro.
+- [ ] Desactivar una extensión: su botón desaparece del menú aA. Activarla: vuelve.
+- [ ] «Permitir en pestañas privadas»: con él apagado, la extensión no actúa en privadas; encendido, sí.
+- [ ] «Opciones» abre la página de opciones de la extensión. «Desinstalar» pide confirmación y la quita.
+- [ ] Cerrar y abrir Brisa: las extensiones siguen instaladas y sus botones en el menú aA.
