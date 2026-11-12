@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brisa</title>
+<!--
+  Página de error de Brisa (#61). La abre Engine.kt (onLoadError) con los datos en la dirección:
+  ?k=tipo&h=servidor&t=título&m=mensaje&… y Gecko le da a esta página document.addCertException().
+  Todo el texto se pone con textContent: nada de lo que llega en la dirección se interpreta como HTML.
+-->
+<style>
+  :root { color-scheme: light dark; --fondo: #F2F4F7; --tarjeta: #FFFFFF; --texto: #1C1C1E; --suave: #55575C;
+          --azul: #0C447C; --azul-texto: #FFFFFF; --borde: #DADDE3; --aviso: #B3261E; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #141518; --tarjeta: #1F2023; --texto: #F2F2F7; --suave: #AEAEB2; --azul: #85B7EB; --azul-texto: #0C1F33;
+            --borde: #3A3A3C; --aviso: #F2B8B5; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+         background: var(--fondo); color: var(--texto); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 100%; max-width: 520px; background: var(--tarjeta); border-radius: 20px; padding: 28px 24px;
+         box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  .icono { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+           background: color-mix(in srgb, var(--azul) 14%, transparent); margin-bottom: 16px; }
+  .icono.peligro { background: color-mix(in srgb, var(--aviso) 16%, transparent); }
+  h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; }
+  p { margin: 0 0 12px; color: var(--suave); }
+  .servidor { font-weight: 600; color: var(--texto); word-break: break-all; }
+  .botones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  button { font: inherit; font-weight: 600; border-radius: 12px; padding: 12px 18px; min-height: 48px; cursor: pointer;
+           border: 1px solid var(--borde); background: transparent; color: var(--texto); }
+  button.principal { background: var(--azul); color: var(--azul-texto); border-color: var(--azul); }
+  button.riesgo { color: var(--aviso); border-color: var(--aviso); }
+  details { margin-top: 18px; border-top: 1px solid var(--borde); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  dl { margin: 12px 0 0; font-size: 14px; }
+  dt { color: var(--suave); margin-top: 8px; }
+  dd { margin: 0; word-break: break-all; font-family: ui-monospace, monospace; font-size: 13px; }
+  .nota { font-size: 14px; margin-top: 12px; }
+  .error { color: var(--aviso); font-size: 14px; margin-top: 10px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="icono" id="icono" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path><path d="M12 9v4M12 16.5v.5"></path>
+    </svg>
+  </div>
+  <h1 id="titulo"></h1>
+  <p id="mensaje"></p>
+  <p class="servidor" id="servidor"></p>
+
+  <div class="botones">
+    <button class="principal" id="reintentar" type="button" hidden>Reintentar</button>
+    <button class="principal" id="volver" type="button">Volver</button>
+  </div>
+
+  <details id="avanzado" hidden>
+    <summary>Avanzado</summary>
+    <p class="nota" id="explica"></p>
+    <dl id="cert" hidden>
+      <dt>Emitido para</dt><dd id="para"></dd>
+      <dt>Emitido por</dt><dd id="por"></dd>
+      <dt>Válido hasta</dt><dd id="hasta"></dd>
+      <dt>Huella SHA-256</dt><dd id="huella"></dd>
+    </dl>
+    <div class="botones">
+      <button class="riesgo" id="aceptar" type="button">Aceptar el riesgo y continuar</button>
+    </div>
+    <p class="error" id="fallo" hidden>No se ha podido añadir la excepción. Vuelve a cargar la página e inténtalo otra vez.</p>
+  </details>
+</main>
+<script>
+(function () {
+  "use strict";
+  var q = new URLSearchParams(location.search);
+  function pon(id, texto) { var e = document.getElementById(id); e.textContent = texto || ""; return e; }
+
+  var tipo = q.get("k") || "red";             // cert | hsts | ssl | https | peligro | red
+  pon("titulo", q.get("t"));
+  pon("mensaje", q.get("m"));
+  pon("servidor", q.get("h"));
+  document.title = q.get("t") || "Brisa";
+  if (tipo === "peligro" || tipo === "cert" || tipo === "hsts") document.getElementById("icono").classList.add("peligro");
+
+  // Volver: a la página anterior; si no hay, a una página en blanco (Inicio de Brisa)
+  document.getElementById("volver").addEventListener("click", function () {
+    if (history.length > 1) history.back(); else location.href = "about:blank";
+  });
+
+  // Errores de red: reintentar
+  if (tipo === "red" || tipo === "ssl") {
+    var r = document.getElementById("reintentar");
+    r.hidden = false;
+    r.addEventListener("click", function () { location.reload(); });
+  }
+
+  // Certificado no válido (p. ej. autofirmado en el homelab): se puede aceptar el riesgo
+  if (tipo === "cert") {
+    document.getElementById("avanzado").hidden = false;
+    pon("explica", q.get("x"));
+    if (q.get("cp")) {
+      document.getElementById("cert").hidden = false;
+      pon("para", q.get("cp")); pon("por", q.get("ci")); pon("hasta", q.get("cv")); pon("huella", q.get("cf"));
+    }
+    var temporal = q.get("tmp") === "1";
+    document.getElementById("aceptar").addEventListener("click", function () {
+      if (typeof document.addCertException !== "function") { document.getElementById("fallo").hidden = false; return; }
+      document.addCertException(temporal).then(function () { location.reload(); },
+        function () { document.getElementById("fallo").hidden = false; });
+    });
+    if (q.get("abrir") === "1") document.getElementById("avanzado").open = true;
+  }
+})();
+</script>
+</body>
+</html>
