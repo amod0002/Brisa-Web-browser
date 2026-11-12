@@ -278,7 +278,10 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             }
             // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
             override fun onLoadError(s: GeckoSession, uri: String?, e: org.mozilla.geckoview.WebRequestError): GeckoResult<String>? {
-                if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return null
+                // #61: siempre una página de error. Si se devuelve null, Gecko para la carga y la pantalla queda en negro
+                // (pasaba con los certificados autofirmados de Proxmox y con cualquier fallo de red).
+                val page = GeckoResult.fromValue(ErrorPages.url(uri, e, private))
+                if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return page
                 val host = History.hostOf(uri)
                 (tabHost as? PromptHost)?.show { close ->
                     androidx.compose.material3.AlertDialog(onDismissRequest = { close() },
@@ -290,7 +293,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                             close(); Privacy.allowInsecureOnce(ctx, s); s.loadUri(uri.replaceFirst("https://", "http://"))
                         }) { androidx.compose.material3.Text("Continuar sin seguridad") } })
                 }
-                return null
+                return page
             }
             override fun onCanGoForward(s: GeckoSession, v: Boolean) { canForward = v }
             // Enlaces target=_blank y window.open: pestaña nueva junto a esta.

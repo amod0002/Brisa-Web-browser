@@ -2,6 +2,10 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.1 · páginas de error y certificados del homelab (issue #61)
+- **Ya no se queda en negro**: cuando una web no carga (certificado no válido, servidor apagado, sin conexión, puerto cerrado…), Brisa enseña una página que explica qué pasa, con «Volver» y, si tiene sentido, «Reintentar».
+- **Certificados autofirmados** (Proxmox, el router, un NAS…): en «Avanzado» se ve para quién es el certificado, quién lo firma, hasta cuándo vale y su huella, y se puede **aceptar el riesgo y continuar**. En la red local Brisa lo recuerda; en internet, solo hasta cerrar Brisa. Si la web exige conexión segura siempre (HSTS), no se deja continuar.
+
 ## 1.1.0 · extensiones (issue #16, gracias @perritys)
 - **Instalar extensiones**: desde addons.mozilla.org dentro de Brisa (el botón «Añadir a Firefox» funciona) o pegando el enlace de la extensión. Solo extensiones firmadas por Mozilla, y antes de instalar se enseñan sus permisos.
 - **Pantalla de extensiones** (menú aA y Ajustes): activar, desactivar, permitir en pestañas privadas, opciones y desinstalar.

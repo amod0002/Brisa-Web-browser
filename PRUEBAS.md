@@ -311,3 +311,13 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] «Permitir en pestañas privadas»: con él apagado, la extensión no actúa en privadas; encendido, sí.
 - [ ] «Opciones» abre la página de opciones de la extensión. «Desinstalar» pide confirmación y la quita.
 - [ ] Cerrar y abrir Brisa: las extensiones siguen instaladas y sus botones en el menú aA.
+
+## 32. Novedades 1.1.1 · páginas de error (issue #61)
+- [ ] Proxmox por https://IP:8006 (certificado autofirmado): sale «Certificado no verificado en tu red» con «Avanzado» abierto, los datos del certificado y la huella. «Aceptar el riesgo y continuar» abre Proxmox.
+- [ ] Cerrar Brisa y volver a entrar en Proxmox: ya no pregunta (en la red local se recuerda).
+- [ ] Lo mismo en una pestaña privada: pregunta y, al aceptar, entra; al cerrar Brisa se olvida.
+- [ ] Una web de internet con certificado caducado (p. ej. expired.badssl.com): «Este sitio no es seguro»; al aceptar entra, y tras cerrar Brisa vuelve a preguntar.
+- [ ] Un nombre que no existe (p. ej. noexiste.lan) y un puerto cerrado de un servidor del homelab: página de error clara con «Reintentar», nada de pantalla negra.
+- [ ] Modo avión: «Sin conexión»; al volver la red, «Reintentar» carga la página.
+- [ ] «Solo HTTPS» activado y una web http://: sale la ventana de siempre y detrás la página explicándolo (no negro).
+- [ ] Tema oscuro: la página de error se ve bien.

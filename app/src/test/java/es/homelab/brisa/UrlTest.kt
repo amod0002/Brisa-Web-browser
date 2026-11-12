@@ -208,3 +208,15 @@ class ExtensionLinkTest {
         org.junit.Assert.assertFalse(Extensions.isXpi("application/pdf", "https://example.org/a.pdf"))
     }
 }
+
+/** #61: qué página de error sale para cada fallo. */
+class ErrorPagesTest {
+    @Test fun certificadoHomelab() {
+        val i = ErrorPages.info(org.mozilla.geckoview.WebRequestError.ERROR_SECURITY_BAD_CERT, "192.168.1.10:8006", local = true)
+        assertEquals("cert", i.kind)
+        org.junit.Assert.assertNotNull(i.explain)
+    }
+    @Test fun hstsSinExcepcion() = assertEquals("hsts", ErrorPages.info(org.mozilla.geckoview.WebRequestError.ERROR_BAD_HSTS_CERT, "x.com", false).kind)
+    @Test fun errorDeRed() = assertEquals("red", ErrorPages.info(org.mozilla.geckoview.WebRequestError.ERROR_UNKNOWN_HOST, "nas.lan", true).kind)
+    @Test fun desconocido() = assertEquals("red", ErrorPages.info(-1, "x.com", false).kind)
+}
