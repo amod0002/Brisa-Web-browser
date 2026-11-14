@@ -2,6 +2,9 @@
 
 package es.homelab.brisa
 
+import androidx.compose.material.icons.outlined.GppMaybe
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -147,7 +150,7 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
                     tint = if (tab.reading) MaterialTheme.colorScheme.primary else tint, modifier = Modifier.size(20.dp))
             }
             Row(Modifier.weight(1f).clickable { setEditing(true) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                if (tab.url.startsWith("https")) Icon(Icons.Filled.Lock, null, Modifier.size(14.dp), tint = tint)
+                SecurityIcon(tab, 14.dp, tint)
                 Text(if (tab.isHome) "Buscar o escribir web" else tab.host, color = if (tab.isHome) tint else strong, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp))
             }
@@ -222,13 +225,15 @@ fun TabletToolbar(tab: Tab, tabCount: Int, favs: Favorites, editing: Boolean, se
             ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tab.url), null))
         }, enabled = !tab.isHome) { Icon(Icons.Outlined.Share, "Compartir") }
         IconButton({ if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url) }, enabled = !tab.isHome) {
-            Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
+            Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                if (favs.has(tab.url)) "Quitar de favoritos" else "Añadir a favoritos")
         }
         DownloadButton(ui, onDownloads)
         IconButton(onNewTab) { Icon(Icons.Filled.Add, "Nueva pestaña") }
         IconButton(onTabs) {
             Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
-                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clearAndSetSemantics { contentDescription = "Pestañas abiertas: $tabCount" })
             }
         }
     }
@@ -348,14 +353,27 @@ fun LockedBar(tabCount: Int, onUnlock: () -> Unit, onTabs: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(50.dp).glass(RoundedCornerShape(25.dp), tint = PrivateGlass).padding(start = 16.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).clickable(onClick = onUnlock), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp), tint = glassContent(true))
+            Icon(Icons.Outlined.Lock, "Pestañas privadas bloqueadas", Modifier.size(16.dp), tint = glassContent(true))
             Text("Pestaña privada bloqueada · Desbloquear", color = glassContent(true), fontSize = 15.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp))
         }
         IconButton(onTabs) {
             Box(Modifier.size(22.dp).border(1.6.dp, glassContent(true), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
-                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = glassContent(true))
+                Text("$tabCount", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = glassContent(true),
+                    modifier = Modifier.clearAndSetSemantics { contentDescription = "Pestañas abiertas: $tabCount" })
             }
         }
+    }
+}
+
+/**
+ * Candado según la seguridad real que informa Gecko (#73), no según si la dirección empieza por https:
+ * candado si es segura; aviso si se ha aceptado un certificado no válido; nada en http o páginas de error.
+ */
+@Composable
+fun SecurityIcon(tab: Tab, size: androidx.compose.ui.unit.Dp, tint: androidx.compose.ui.graphics.Color) {
+    when {
+        tab.certException -> Icon(Icons.Outlined.GppMaybe, "Excepción de certificado", Modifier.size(size), tint = MaterialTheme.colorScheme.error)
+        tab.secure && !tab.isHome -> Icon(Icons.Filled.Lock, "Conexión segura", Modifier.size(size), tint = tint)
     }
 }

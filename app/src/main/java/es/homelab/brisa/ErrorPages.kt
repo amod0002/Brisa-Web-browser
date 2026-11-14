@@ -69,7 +69,7 @@ object ErrorPages {
 
     /** Dirección de la página de error para este fallo. */
     fun url(uri: String?, e: WebRequestError, private: Boolean): String {
-        val host = uri?.let { u -> u.substringAfter("://").substringBefore('/').substringBefore('?') }.orEmpty()
+        val host = uri?.let { u -> History.hostOf(u) }.orEmpty()
         val local = Privacy.isLocal(host)
         val i = info(e.code, host, local)
         val p = linkedMapOf("k" to i.kind, "h" to host, "t" to i.title, "m" to i.message)

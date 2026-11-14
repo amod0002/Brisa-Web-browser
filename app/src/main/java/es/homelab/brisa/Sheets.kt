@@ -63,11 +63,15 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             var showReport by remember { mutableStateOf(false) }
             ListItem(leadingContent = { Icon(if (tab.shieldOff) Icons.Outlined.RemoveModerator else Icons.Outlined.Shield, null) },
-                headlineContent = { Text(if (tab.shieldOff) "Protección desactivada en ${tab.host}" else "${tab.blocked} rastreadores bloqueados") },
+                headlineContent = { Text(if (tab.shieldOff) "Protección desactivada en ${tab.host}" else blockedText(tab)) },
                 supportingContent = { Text("Ver informe de privacidad") },
                 trailingContent = { if (!tab.isHome && !tab.private && tab.trackingPerm != null) Switch(!tab.shieldOff, { tab.toggleShield(); dismiss() }) },
                 modifier = Modifier.clickable { showReport = true })
             if (showReport) ReportSheet({ showReport = false }) { u -> showReport = false; dismiss(); openTab(u) }
+            // #73: se ha aceptado un certificado no válido en este sitio
+            if (tab.certException) ListItem(leadingContent = { Icon(Icons.Outlined.GppMaybe, null, tint = MaterialTheme.colorScheme.error) },
+                headlineContent = { Text("Has aceptado un certificado no válido para este sitio") },
+                supportingContent = { Text("La conexión está cifrada, pero Brisa no puede comprobar quién hay al otro lado") })
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Tamaño del texto", Modifier.weight(1f))
                 OutlinedButton({ size = (size - 0.1f).coerceAtLeast(0.8f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 13.sp) }
@@ -276,5 +280,19 @@ fun ReportSheet(dismiss: () -> Unit, openTab: (String) -> Unit = {}) {
             }
             TextButton({ Report.clear() }, Modifier.padding(top = 4.dp)) { Text("Borrar informe") }
         }
+    }
+}
+
+/**
+ * Cabecera del menú «aA» (#77): con uBlock, uBlock bloquea casi todo antes que Gecko, así que se suma su
+ * contador de esta pestaña. Si uBlock no da contador, se dice que está activo en vez de «0 bloqueados».
+ */
+fun blockedText(tab: Tab): String {
+    val ub = tab.extActions[Engine.UBLOCK_ID]?.badgeText?.trim()?.toIntOrNull()
+    val ublockOn = Extensions.list.any { it.id == Engine.UBLOCK_ID && it.metaData.enabled }
+    return when {
+        ub != null -> "${tab.blocked + ub} bloqueados (uBlock + Gecko)"
+        ublockOn && tab.blocked == 0 -> "Protección activa · uBlock Origin"
+        else -> "${tab.blocked} rastreadores bloqueados"
     }
 }

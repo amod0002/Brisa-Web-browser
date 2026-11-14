@@ -110,7 +110,8 @@ object ExternalApps {
 
     /** Pregunta «¿Abrir en X?» (siempre en privadas) o, si el ajuste lo dice, abre directamente. */
     private fun askThen(ctx: Context, tab: Tab, app: String?, host: String?, stayInBrisa: AllowOrDeny, open: () -> Boolean): GeckoResult<AllowOrDeny> {
-        val host2 = (ctx as? PromptHost)
+        // #75: el host siempre de la Activity, aunque la pestaña se creara con otro contexto
+        val host2 = (Tab.tabHost as? PromptHost) ?: (ctx as? PromptHost)
         if ((!Settings.askApps && !tab.private) || host2 == null) {
             return GeckoResult.fromValue(if (open()) AllowOrDeny.DENY else stayInBrisa)
         }

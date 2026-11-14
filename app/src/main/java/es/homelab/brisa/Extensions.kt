@@ -64,6 +64,13 @@ object Extensions {
         controller.list().accept({ l ->
             val mine = l.orEmpty().filter(::isMine)
             if (attachAll) mine.forEach(::attach)
+            // #69: quien ya tenía uBlock lo tenía desactivado en privadas. Se activa una sola vez
+            // (si luego el usuario lo desactiva a mano, se respeta).
+            val p = app.getSharedPreferences("ajustes", 0)
+            if (attachAll && !p.getBoolean("ublock_privadas", false)) mine.firstOrNull { it.id == Engine.UBLOCK_ID }?.let { u ->
+                p.edit().putBoolean("ublock_privadas", true).apply()
+                if (!u.metaData.allowedInPrivateBrowsing) controller.setAllowedInPrivateBrowsing(u, true).accept({ refresh() }, { })
+            }
             list.clear(); list.addAll(mine.sortedBy { (it.metaData.name ?: it.id).lowercase() })
         }, { })
     }
@@ -73,18 +80,25 @@ object Extensions {
         if (!isMine(e)) return
         e.setActionDelegate(object : WebExtension.ActionDelegate {
             // Botón por defecto de la extensión (session == null). Los cambios por pestaña (p. ej. un contador) aún no se muestran.
+            // Por pestaña (session != null): p. ej. el contador de uBlock (#67 #77)
             override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
                 if (session == null) actions[extension.id] = action
+                else Tab.bySession[session]?.extActions?.put(extension.id, action)
             }
-            override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? =
-                if (popup?.ext?.id == extension.id) { closePopup(); null } else openPopup(extension)
-            override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? = openPopup(extension)
+            override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
+                android.util.Log.d("Brisa", "onTogglePopup ${extension.id}")
+                return if (popup?.ext?.id == extension.id) { closePopup(); null } else openPopup(extension)
+            }
+            override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
+                android.util.Log.d("Brisa", "onOpenPopup ${extension.id}")
+                return openPopup(extension)
+            }
         })
         e.setTabDelegate(object : WebExtension.TabDelegate {
             // La extensión abre una pestaña suya (bienvenida, ajustes, una web…): Gecko abre la sesión
             override fun onNewTab(source: WebExtension, createDetails: WebExtension.CreateTabDetails): GeckoResult<GeckoSession>? {
                 val host = Tab.tabHost ?: return null
-                val t = Tab(app, false, createDetails.url, openNow = false)
+                val t = Tab(tabCtx(), false, createDetails.url, openNow = false)
                 host.openTab(t)
                 return GeckoResult.fromValue(t.session)
             }
@@ -102,7 +116,8 @@ object Extensions {
             // Un enlace de la ventanita que abre otra ventana: pestaña nueva, y se cierra la ventanita
             override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
                 val host = Tab.tabHost ?: return null
-                val t = Tab(app, false, uri, openNow = false)
+                // Desde una privada, la pestaña también es privada (#75)
+                val t = Tab(tabCtx(), Tab.visible?.private == true, uri, openNow = false)
                 host.openTab(t); closePopup()
                 return GeckoResult.fromValue(t.session)
             }
@@ -123,11 +138,27 @@ object Extensions {
     /** Página de opciones de la extensión, en una pestaña. */
     fun openOptions(e: WebExtension): Boolean {
         val u = e.metaData.optionsPageUrl ?: return false
-        Tab.tabHost?.openTab(Tab(app, false, u))
+        Tab.tabHost?.openTab(Tab(tabCtx(), false, u))
         return true
     }
 
     fun recommended(e: WebExtension) = e.id in RECOMMENDED
+
+    /** addons.mozilla.org (y su CDN de descargas): la única web que instala extensiones sin aviso (#64). */
+    fun isAmo(url: String): Boolean {
+        val h = History.hostOf(url).lowercase()
+        return url.startsWith("https://") && (h == "addons.mozilla.org" || h == "addons.cdn.mozilla.net")
+    }
+
+    /** Contexto para las pestañas que abren las extensiones: la Activity, no el de la aplicación (#75). */
+    private fun tabCtx(): Context = (Tab.tabHost as? Context) ?: app
+
+    /** Botón de una extensión tal como se ve en la pestaña visible (con su contador, si lo tiene). */
+    fun actionFor(id: String): WebExtension.Action? {
+        val def = actions[id]
+        val mine = Tab.visible?.extActions?.get(id) ?: return def
+        return if (def != null) mine.withDefault(def) else mine
+    }
 
     /**
      * Instalar desde un enlace: una ficha de addons.mozilla.org (…/addon/<nombre>/) o un .xpi.

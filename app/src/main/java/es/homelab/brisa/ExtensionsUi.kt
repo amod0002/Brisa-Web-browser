@@ -52,12 +52,18 @@ fun ExtIcon(img: org.mozilla.geckoview.Image?, size: Dp = 28.dp) {
 fun ExtensionActions(onAction: () -> Unit) {
     val shown = Extensions.list.filter { it.metaData.enabled && Extensions.actions[it.id] != null }
     if (shown.isEmpty()) return
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // En varias líneas: ninguno queda cortado sin que se note (#80)
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         shown.forEach { e ->
-            val a = Extensions.actions[e.id] ?: return@forEach
+            val a = Extensions.actionFor(e.id) ?: return@forEach
             val name = a.title ?: e.metaData.name ?: e.id
-            FilledTonalButton({ onAction(); a.click() }, enabled = a.enabled != false,
+            FilledTonalButton({
+                // #67: Gecko abre la ventanita en la pestaña con foco; la hoja «aA» se lo ha quitado a la vista
+                Tab.visible?.session?.takeIf { it.isOpen }?.setFocused(true)
+                onAction(); a.click()
+            }, enabled = a.enabled != false,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
                 ExtIcon(a.icon ?: e.metaData.icon, 20.dp)
                 Text(name, Modifier.padding(start = 8.dp).widthIn(max = 140.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
@@ -82,7 +88,9 @@ fun ExtensionPopupSheet(p: Extensions.Popup) {
             Text(p.ext.metaData.name ?: p.ext.id, Modifier.padding(start = 10.dp).weight(1f), fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        AndroidView({ view }, Modifier.fillMaxWidth().height(520.dp).padding(top = 8.dp))
+        // #79: según la pantalla (en horizontal no se corta); la web de la ventanita hace scroll dentro
+        val h = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.7f).coerceIn(200f, 560f)
+        AndroidView({ view }, Modifier.fillMaxWidth().height(h.dp).padding(top = 8.dp))
     }
 }
 

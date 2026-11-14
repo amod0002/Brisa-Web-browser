@@ -65,6 +65,7 @@ class History private constructor(ctx: Context) {
     companion object {
         @Volatile private var inst: History? = null
         fun get(ctx: Context) = inst ?: synchronized(this) { inst ?: History(ctx.applicationContext).also { inst = it } }
-        fun hostOf(url: String) = url.substringAfter("://").substringBefore("/").removePrefix("www.")
+        fun hostOf(url: String) = url.substringAfter("://").substringBefore("/").substringBefore('?').substringBefore('#')
+            .substringAfterLast('@').removePrefix("www.")
     }
 }

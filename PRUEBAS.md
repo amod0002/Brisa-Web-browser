@@ -321,3 +321,15 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Modo avión: «Sin conexión»; al volver la red, «Reintentar» carga la página.
 - [ ] «Solo HTTPS» activado y una web http://: sale la ventana de siempre y detrás la página explicándolo (no negro).
 - [ ] Tema oscuro: la página de error se ve bien.
+
+## 33. Novedades 1.1.2 · issues #64–#80
+- [ ] addons.mozilla.org → «Añadir a Firefox» en una extensión: instala como siempre (con la casilla «Permitir en pestañas privadas»).
+- [ ] Página de prueba que hace `location.href = "https://ejemplo.com/algo.xpi"` al cargar: no sale nada (solo el aviso «Brisa ha impedido…»).
+- [ ] Pestaña privada con una web llena de anuncios: limpia como en normal; el menú aA dice «X bloqueados (uBlock + Gecko)».
+- [ ] https://self-signed.badssl.com: sin candado en la página de error; tras aceptar, aviso rojo en la barra y la línea en el menú aA.
+- [ ] https://httpbin.org/redirect-to?url=https://example.com → la barra muestra example.com. En m.youtube.com, abrir dos vídeos y compartir: se comparte el segundo.
+- [ ] Brisa quitada de Recientes, abrir un enlace desde Telegram: no se ve Inicio en ningún momento.
+- [ ] 4 pestañas, `adb shell am send-trim-memory es.homelab.brisa COMPLETE`, volver: la cuadrícula tiene las 4 miniaturas.
+- [ ] Menú aA → botón de ClearURLs o Decentraleyes 10 veces seguidas: las 10 abre su ventanita. En horizontal, la ventanita cabe.
+- [ ] Mantener pulsado un favorito en Inicio: sale el menú; «Quitar de favoritos» lo quita.
+- [ ] Con TalkBack: el botón de pestañas dice «Pestañas abiertas: N»; el favorito dice «Añadir/Quitar de favoritos».

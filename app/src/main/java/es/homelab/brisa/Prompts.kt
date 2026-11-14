@@ -39,6 +39,8 @@ interface PromptHost {
  * subir archivos, fecha y hora.
  */
 class Prompts(private val ctx: Context, private val host: () -> PromptHost?, private val pageUrl: () -> String = { "" }) : PromptDelegate {
+    /** Para diálogos de Android: la Activity (con el de la aplicación se cierra Brisa, #75). */
+    private fun uiCtx(): Context = (host() as? Context) ?: (Tab.tabHost as? Context) ?: ctx
 
     // ---- #21: una web no puede encerrarte a base de alert() -----------------------------------------
     private var blockDialogs = false
@@ -221,13 +223,13 @@ class Prompts(private val ctx: Context, private val host: () -> PromptHost?, pri
         when (p.type) {
             DateTimePrompt.Type.TIME -> {
                 if (!def.isNullOrBlank()) runCatching { def.split(":").let { cal.set(java.util.Calendar.HOUR_OF_DAY, it[0].toInt()); cal.set(java.util.Calendar.MINUTE, it[1].toInt()) } }
-                android.app.TimePickerDialog(ctx, { _, h, m -> r.complete(p.confirm("${pad(h)}:${pad(m)}")) },
+                android.app.TimePickerDialog(uiCtx(), { _, h, m -> r.complete(p.confirm("${pad(h)}:${pad(m)}")) },
                     cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE), true).apply {
                     setOnCancelListener { r.complete(p.dismiss()) }; show() }
             }
             DateTimePrompt.Type.DATE, DateTimePrompt.Type.MONTH, DateTimePrompt.Type.WEEK -> {
                 if (!def.isNullOrBlank()) runCatching { def.split("-").let { cal.set(it[0].toInt(), it[1].toInt() - 1, it.getOrNull(2)?.toIntOrNull() ?: 1) } }
-                android.app.DatePickerDialog(ctx, { _, y, m, d ->
+                android.app.DatePickerDialog(uiCtx(), { _, y, m, d ->
                     r.complete(p.confirm(if (p.type == DateTimePrompt.Type.MONTH) "$y-${pad(m + 1)}" else "$y-${pad(m + 1)}-${pad(d)}"))
                 }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).apply {
                     setOnCancelListener { r.complete(p.dismiss()) }; show() }

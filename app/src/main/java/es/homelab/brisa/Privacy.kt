@@ -183,10 +183,19 @@ object Privacy {
             return ip == "::1" || ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe8") || ip.startsWith("fe9") ||
                 ip.startsWith("fea") || ip.startsWith("feb")
         }
-        val h = t.substringBefore(':').substringBefore('/')
-        return h == "localhost" || LOCAL_DOMAINS.any { h.endsWith(".$it") } || Regex("^169\\.254\\.").containsMatchIn(h) ||
-            Regex("^(10|127)\\.").containsMatchIn(h) || Regex("^192\\.168\\.").containsMatchIn(h) ||
-            Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(h) || Regex("^100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.").containsMatchIn(h)
+        // #76: sin usuario@ delante ni :puerto, y los rangos privados solo valen para IPs completas, no para nombres
+        val h = t.substringAfterLast('@').substringBefore('/').substringBefore(':')
+        if (h == "localhost" || LOCAL_DOMAINS.any { h.endsWith(".$it") }) return true
+        val o = ipv4(h) ?: return false
+        return o[0] == 10 || o[0] == 127 || (o[0] == 192 && o[1] == 168) || (o[0] == 169 && o[1] == 254) ||
+            (o[0] == 172 && o[1] in 16..31) || (o[0] == 100 && o[1] in 64..127)
+    }
+
+    /** Los 4 números de una IPv4 escrita tal cual (0-255), o null si no es una IP. */
+    fun ipv4(h: String): List<Int>? {
+        val p = h.split('.')
+        if (p.size != 4) return null
+        return p.map { s -> if (s.isEmpty() || s.length > 3 || !s.all(Char::isDigit)) return null else s.toInt().takeIf { it <= 255 } ?: return null }
     }
 
     /**

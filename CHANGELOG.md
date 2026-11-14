@@ -2,6 +2,21 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.2 · seguridad de extensiones, candado real y arreglos (issues #64–#67, #69, #72, #73, #75–#80, gracias @perritys)
+- **Instalar extensiones desde webs** (#64): solo addons.mozilla.org instala directamente y siempre tras un toque. Cualquier otra web muestra antes un aviso de Brisa (con «Cancelar» por defecto); sin toque o en privadas, no se instala nada.
+- **Red local** (#76): `10.ejemplo.com` o `192.168.algo.org` ya no cuentan como «tu red»; solo IPs privadas de verdad y dominios locales.
+- **uBlock en privadas** (#69): ahora también bloquea en las pestañas privadas (se activa una vez a quien ya lo tenía). Al instalar otras extensiones, casilla «Permitir en pestañas privadas».
+- **Candado real** (#73): según la seguridad que informa Gecko; con un certificado aceptado a mano sale un aviso rojo y una línea en el menú aA.
+- **Dirección correcta** (#72): la barra, compartir, favoritos e historial siguen redirecciones y webs de una sola página (YouTube móvil…).
+- **Abrir enlaces en frío** (#65): ya no se ve Inicio un instante.
+- **Miniaturas** (#66): vuelven a leerse del disco tras un aviso de poca memoria, y se guardan al salir aunque la página esté cargando.
+- **Botones de extensiones** (#67): abren su ventanita a la primera (la pestaña visible queda enfocada para Gecko) y muestran el contador de cada pestaña.
+- **Pestañas de extensiones** (#75): se crean con la pantalla de Brisa, así que los campos de fecha ya no la cierran y se pregunta antes de abrir apps. Desde una privada, el enlace de la ventanita abre privada.
+- **Contador del menú aA** (#77): suma lo bloqueado por uBlock: «X bloqueados (uBlock + Gecko)».
+- **Favoritos en Inicio** (#78): mantener pulsado abre un menú (pestaña nueva, privada, quitar) en vez de borrarlo.
+- **Ventanita de extensiones** (#79): altura según la pantalla; en horizontal ya no se corta.
+- **TalkBack** (#80): descripciones en el botón de pestañas, favorito y candado; los botones de extensiones pasan a varias líneas si no caben.
+
 ## 1.1.1 · páginas de error y certificados del homelab (issue #61)
 - **Ya no se queda en negro**: cuando una web no carga (certificado no válido, servidor apagado, sin conexión, puerto cerrado…), Brisa enseña una página que explica qué pasa, con «Volver» y, si tiene sentido, «Reintentar».
 - **Certificados autofirmados** (Proxmox, el router, un NAS…): en «Avanzado» se ve para quién es el certificado, quién lo firma, hasta cuándo vale y su huella, y se puede **aceptar el riesgo y continuar**. En la red local Brisa lo recuerda; en internet, solo hasta cerrar Brisa. Si la web exige conexión segura siempre (HSTS), no se deja continuar.

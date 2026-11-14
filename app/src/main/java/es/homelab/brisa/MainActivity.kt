@@ -7,6 +7,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -380,8 +382,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
      * Miniatura de [t], que tiene que ser la que está en la vista. No se hace si aún no ha pintado nada o
      * se está recargando (saldría en blanco): mejor quedarse con la anterior (#58).
      */
-    suspend fun capture(t: Tab) {
-        if (attached[0] !== t || t.isHome || !t.painted || t.progress < 50 || (t.private && ui.privateLocked) || !t.session.isOpen) return
+    suspend fun capture(t: Tab, force: Boolean = false) {
+        if (attached[0] !== t || t.isHome || !t.painted || (t.progress < 50 && !force) || (t.private && ui.privateLocked) || !t.session.isOpen) return
         val b = kotlinx.coroutines.withTimeoutOrNull(300) {
             kotlinx.coroutines.suspendCancellableCoroutine<android.graphics.Bitmap?> { c ->
                 geckoView.capturePixels().accept({ if (c.isActive) c.resumeWith(Result.success(it)) }, { if (c.isActive) c.resumeWith(Result.success(null)) })
@@ -389,7 +391,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         }
         t.saveThumb(b)
     }
-    SideEffect { ui.captureNow = { scope.launch { capture(tab) } } }
+    // Al salir de Brisa, aunque esté a medio cargar: mejor eso que quedarse sin miniatura (#66)
+    SideEffect { ui.captureNow = { scope.launch { capture(tab, force = true) } } }
     // Estirar para recargar
     val density = androidx.compose.ui.platform.LocalDensity.current
     var pull by remember { mutableFloatStateOf(0f) }
@@ -421,7 +424,9 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
         Tab.visible = tab; ui.context = null
         if (!(tab.private && ui.privateLocked)) { tab.active(true); tab.wake() }
         // Las pestañas en segundo plano se pausan: no gastan red ni procesador mientras carga la visible
-        tabs.forEach { if (it !== tab) it.active(false) }
+        tabs.forEach { if (it !== tab) { it.active(false); if (it.session.isOpen) it.session.setFocused(false) } }
+        // #67: la visible, también enfocada para Gecko (las extensiones abren su ventanita en la pestaña con foco)
+        if (tab.session.isOpen) tab.session.setFocused(true)
     }
     LaunchedEffect(tab) {
         androidx.compose.runtime.snapshotFlow { tab.barsHidden }.collect { collapsed = it }
@@ -544,7 +549,7 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                     Row(Modifier.glass(RoundedCornerShape(50), tint = if (tab.private) PrivateGlass else null)
                         .clickable { collapsed = false }.padding(horizontal = 18.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        if (tab.url.startsWith("https")) Icon(Icons.Filled.Lock, null, Modifier.size(12.dp), tint = glassContentDim(tab.private))
+                        SecurityIcon(tab, 12.dp, glassContentDim(tab.private))
                         Text(tab.host, fontSize = 13.sp, color = glassContent(tab.private), modifier = Modifier.padding(start = 4.dp))
                     }
                 } else if (tab.findText != null) FindBar(tab)
@@ -565,11 +570,13 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
                                 .putExtra(Intent.EXTRA_TEXT, tab.url), null))
                         }, enabled = !tab.isHome) { Icon(Icons.Outlined.Share, "Compartir") }
                         IconButton({ if (!tab.isHome) favs.toggle(tab.title.ifBlank { tab.host }, tab.url) }, enabled = !tab.isHome) {
-                            Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Favorito")
+                            Icon(if (favs.has(tab.url)) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                if (favs.has(tab.url)) "Quitar de favoritos" else "Añadir a favoritos")
                         }
                         DownloadButton(ui) { showDownloads = true }
                         IconButton({ showTabs = true; scope.launch { capture(tab) } }) {
-                            Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(22.dp).border(1.6.dp, LocalContentColor.current, RoundedCornerShape(6.dp))
+                                .clearAndSetSemantics { contentDescription = "Pestañas abiertas: ${tabs.size}" }, contentAlignment = Alignment.Center) {
                                 Text("${tabs.size}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
