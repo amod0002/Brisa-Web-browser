@@ -68,7 +68,8 @@ object Extensions {
 
     // ---- Proceso de las extensiones (#81) ----
 
-    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    // Perezoso: los tests unitarios usan Extensions sin Looper de Android
+    private val main by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
     /** Gecko ha dejado de arrancar el proceso de las extensiones: uBlock no responde y las webs pueden quedarse colgadas. */
     var processStopped by mutableStateOf(false)
         private set
