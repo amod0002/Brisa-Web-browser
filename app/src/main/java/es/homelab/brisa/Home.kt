@@ -67,9 +67,19 @@ fun HomePage(favs: Favorites, private: Boolean, open: (String) -> Unit) {
         list.chunked(cols).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 row.forEach { (name, url) ->
-                    Column(Modifier.weight(1f).combinedClickableCompat({ open(url) }, { favs.toggle(name, url) }), horizontalAlignment = Alignment.CenterHorizontally) {
-                        SiteIcon(History.hostOf(url), 58.dp, 14.dp)
-                        Text(name, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
+                    // #78: mantener pulsado abre un menú; quitar ya no es instantáneo
+                    var menu by remember { mutableStateOf(false) }
+                    Box(Modifier.weight(1f)) {
+                        Column(Modifier.fillMaxWidth().combinedClickableCompat({ open(url) }, { menu = true }), horizontalAlignment = Alignment.CenterHorizontally) {
+                            SiteIcon(History.hostOf(url), 58.dp, 14.dp)
+                            Text(name, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp))
+                        }
+                        androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
+                            val newTab = { priv: Boolean -> Tab.tabHost?.let { h -> (h as? android.content.Context)?.let { c -> h.openTab(Tab(c, priv, url)) } } }
+                            androidx.compose.material3.DropdownMenuItem({ Text("Abrir en pestaña nueva") }, { menu = false; newTab(false) })
+                            androidx.compose.material3.DropdownMenuItem({ Text("Abrir en pestaña privada") }, { menu = false; newTab(true) })
+                            androidx.compose.material3.DropdownMenuItem({ Text("Quitar de favoritos", color = MaterialTheme.colorScheme.error) }, { menu = false; favs.toggle(name, url) })
+                        }
                     }
                 }
                 repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }

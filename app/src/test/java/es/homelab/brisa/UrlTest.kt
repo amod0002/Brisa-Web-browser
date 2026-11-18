@@ -1,6 +1,8 @@
 package es.homelab.brisa
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UrlTest {
@@ -219,4 +221,24 @@ class ErrorPagesTest {
     @Test fun hstsSinExcepcion() = assertEquals("hsts", ErrorPages.info(org.mozilla.geckoview.WebRequestError.ERROR_BAD_HSTS_CERT, "x.com", false).kind)
     @Test fun errorDeRed() = assertEquals("red", ErrorPages.info(org.mozilla.geckoview.WebRequestError.ERROR_UNKNOWN_HOST, "nas.lan", true).kind)
     @Test fun desconocido() = assertEquals("red", ErrorPages.info(-1, "x.com", false).kind)
+
+    // #76: los rangos privados solo valen para IPs completas, no para nombres de dominio
+    @Test fun redLocalSoloIps() {
+        assertFalse(Privacy.isLocal("10.example.com"))
+        assertFalse(Privacy.isLocal("192.168.example.org"))
+        assertFalse(Privacy.isLocal("127.algo.net"))
+        assertFalse(Privacy.isLocal("192.168.1.300"))
+        assertTrue(Privacy.isLocal("192.168.1.10"))
+        assertTrue(Privacy.isLocal("10.0.0.1:8006"))
+        assertTrue(Privacy.isLocal("usuario@172.16.0.5"))
+        assertTrue(Privacy.isLocal("pve.lan"))
+        assertEquals("example.com", History.hostOf("https://user:pw@example.com/x"))
+        assertEquals("example.com", History.hostOf("https://example.com?q=1"))
+    }
+    // #64: solo addons.mozilla.org instala extensiones sin aviso
+    @Test fun soloAmoInstala() {
+        assertTrue(Extensions.isAmo("https://addons.mozilla.org/firefox/downloads/file/1/x.xpi"))
+        assertFalse(Extensions.isAmo("https://addons.mozilla.org.evil.com/x.xpi"))
+        assertFalse(Extensions.isAmo("http://addons.mozilla.org/x.xpi"))
+    }
 }

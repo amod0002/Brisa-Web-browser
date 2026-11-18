@@ -83,6 +83,8 @@ fun TabGrid(tabs: List<Tab>, current: Int, ui: UiState, select: (Int) -> Unit, o
                         Text(t.title.ifBlank { if (t.isHome) "Inicio" else t.host }, Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         IconButton({ onClose(i) }, Modifier.size(36.dp)) { Icon(Icons.Filled.Close, "Cerrar", Modifier.size(16.dp)) }
                     }
+                    // #66: si se soltó por falta de memoria, se vuelve a leer del disco
+                    LaunchedEffect(t.id, t.thumb) { if (t.thumb == null && !t.private && !t.isHome) Thumbs.load(ctx, t.id) { b -> if (t.thumb == null) t.thumb = b } }
                     val th = t.thumb
                     if (th != null) Image(th.asImageBitmap(), null, Modifier.fillMaxWidth().height(200.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
                     else Box(Modifier.fillMaxWidth().height(200.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh))

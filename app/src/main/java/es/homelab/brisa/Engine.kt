@@ -64,19 +64,26 @@ object Engine {
                 ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
             ): GeckoResult<WebExtension.PermissionPromptResponse> {
                 // uBlock Origin lo instala Brisa: sin preguntar. Cualquier otra extensión, solo si el usuario acepta.
-                if (ext.id == UBLOCK_ID) return GeckoResult.fromValue(WebExtension.PermissionPromptResponse(true, false, false))
+                // #69: también en privadas, que es donde más falta hace
+                if (ext.id == UBLOCK_ID) return GeckoResult.fromValue(WebExtension.PermissionPromptResponse(true, true, false))
                 val r = GeckoResult<WebExtension.PermissionPromptResponse>()
                 val h = Tab.tabHost as? PromptHost ?: return GeckoResult.fromValue(WebExtension.PermissionPromptResponse(false, false, false))
                 var answered = false
-                fun answer(ok: Boolean) { if (!answered) { answered = true; r.complete(WebExtension.PermissionPromptResponse(ok, false, false)) } }
+                fun answer(ok: Boolean, inPrivate: Boolean = false) { if (!answered) { answered = true; r.complete(WebExtension.PermissionPromptResponse(ok, inPrivate, false)) } }
                 val name = ext.metaData.name ?: ext.id
                 h.show { close ->
+                    var priv by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
                     androidx.compose.material3.AlertDialog(onDismissRequest = { answer(false); close() },
                         title = { androidx.compose.material3.Text("¿Instalar la extensión «$name»?") },
-                        text = { androidx.compose.material3.Text(
+                        text = { androidx.compose.foundation.layout.Column { androidx.compose.material3.Text(
                             (if (origins.any { it == "<all_urls>" || it.startsWith("*://*/") }) "Podrá leer y cambiar todo lo que veas en todas las webs.\n\n" else "") +
-                            "Permisos: " + (perms + origins).joinToString(", ").ifEmpty { "ninguno" }) },
-                        confirmButton = { androidx.compose.material3.TextButton({ answer(true); close() }) { androidx.compose.material3.Text("Instalar") } },
+                            "Permisos: " + (perms + origins).joinToString(", ").ifEmpty { "ninguno" })
+                            // Como Firefox: desactivada en privadas salvo que se marque (#69)
+                            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                androidx.compose.material3.Checkbox(priv, { priv = it })
+                                androidx.compose.material3.Text("Permitir en pestañas privadas")
+                            } } },
+                        confirmButton = { androidx.compose.material3.TextButton({ answer(true, priv); close() }) { androidx.compose.material3.Text("Instalar") } },
                         dismissButton = { androidx.compose.material3.TextButton({ answer(false); close() }) { androidx.compose.material3.Text("Cancelar") } })
                 }
                 return r
@@ -194,6 +201,47 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var state: String? = restore
         private set
     var url by mutableStateOf(startUrl ?: "")
+    /** Es la página de Inicio. Va aparte de la URL (#65): al abrir la sesión Gecko pasa un instante por about:blank. */
+    var home by mutableStateOf(startUrl.isNullOrBlank() || startUrl == "about:blank")
+        private set
+    /**
+     * Seguridad real de la conexión, según Gecko (#73). Lo que informa onSecurityChange se guarda junto con el
+     * host al que se refiere: Gecko no siempre lo manda después de onPageStart (atrás/adelante, caché, webs de una
+     * sola página), así que borrarlo al empezar cada carga dejaba el candado mal. Lo que se pinta sale de
+     * [security], que cruza la dirección actual con ese dato.
+     */
+    private var secHost by mutableStateOf<String?>(null)
+    private var secSecure by mutableStateOf(false)
+    private var secException by mutableStateOf(false)
+    private var secMixed by mutableStateOf(false)
+    /** Quién firma el certificado (para la ficha del sitio). */
+    var secIssuer by mutableStateOf<String?>(null)
+        private set
+    /** Último error de carga (tipo de ErrorPages.Info.kind) y host en que pasó: un certificado roto se marca «No seguro». */
+    private var errHost by mutableStateOf<String?>(null)
+    private var errKind by mutableStateOf<String?>(null)
+    val certException get() = security == Security.EXCEPTION
+    val secure get() = security == Security.SECURE || security == Security.MIXED
+
+    /** Lo que se enseña en la barra, estilo Firefox/Chrome. */
+    val security: Security get() {
+        if (isHome) return Security.NONE
+        val u = url.lowercase()
+        val h = History.hostOf(url).lowercase()
+        return when {
+            u.startsWith("http://") -> Security.HTTP
+            !u.startsWith("https://") -> Security.NONE // páginas internas, de extensiones, data:…
+            secHost == h && secException -> Security.EXCEPTION
+            errHost == h && errKind in setOf("cert", "hsts", "ssl") -> Security.BROKEN
+            secHost == h && secSecure && secMixed -> Security.MIXED
+            secHost == h && secSecure -> Security.SECURE
+            else -> Security.NONE // aún sin datos de Gecko (cargando) o error de red
+        }
+    }
+    /** Botones de las extensiones en ESTA pestaña (p. ej. el contador de uBlock, #67 #77), por id de extensión. */
+    val extActions = androidx.compose.runtime.mutableStateMapOf<String, WebExtension.Action>()
+    /** Ya se ha avisado de un .xpi en esta carga (#64): una web no puede encadenar avisos. */
+    private var xpiAsked = false
     var title by mutableStateOf("")
     var progress by mutableIntStateOf(100)
     var canBack by mutableStateOf(false)
@@ -225,9 +273,21 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { url = u; progress = 5; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
+            override fun onPageStart(s: GeckoSession, u: String) { if (!setUrl(u)) return; progress = 5; xpiAsked = false; if (errHost != History.hostOf(u).lowercase()) { errHost = null; errKind = null }; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; if (!isHome) painted = true; Privacy.restoreAfterLoad(ctx, s) }
+            override fun onSecurityChange(s: GeckoSession, info: GeckoSession.ProgressDelegate.SecurityInformation) {
+                val h = (info.host?.takeIf { it.isNotBlank() } ?: History.hostOf(info.origin ?: url)).lowercase()
+                secHost = h; secSecure = info.isSecure; secException = info.isException
+                // Contenido http dentro de una web https (imágenes, scripts…): candado con aviso, como Firefox
+                secMixed = info.mixedModeActive == GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED ||
+                    info.mixedModePassive == GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED
+                secIssuer = info.certificate?.let { c -> runCatching {
+                    val dn = c.issuerX500Principal.name
+                    Regex("(?:^|,)O=([^,]+)").find(dn)?.groupValues?.get(1) ?: Regex("CN=([^,]+)").find(dn)?.groupValues?.get(1)
+                }.getOrNull() }
+                if (info.isSecure && errHost == h) { errHost = null; errKind = null }
+            }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { lastState = st; if (!private) state = st.toString() }
         }
         contentDelegate = object : GeckoSession.ContentDelegate {
@@ -238,7 +298,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 // #16: un .xpi (el botón «Añadir» de addons.mozilla.org) se instala como extensión, no se descarga
                 if (Extensions.isXpi(r.headers["Content-Type"] ?: r.headers["content-type"], r.uri)) {
                     runCatching { r.body?.close() }
-                    Extensions.installUrl(ctx, r.uri); return
+                    xpi(r.uri); return
                 }
                 Downloads.ask(ctx, r, url, private)
             }
@@ -274,6 +334,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
             override fun onLocationChange(s: GeckoSession, u: String?, perms: List<GeckoSession.PermissionDelegate.ContentPermission>, gesture: Boolean) {
                 // Permisos de «Solo esta vez»: se retiran al irse a otra web (#24)
                 Permissions.leaveSite(ctx, s, History.hostOf(u ?: ""))
+                // #72: la dirección real, también tras redirecciones y en webs de una sola página (pushState, #…)
+                if (u != null && u != url && setUrl(u)) prompts.resetDialogs(u)
                 trackingPerm = perms.firstOrNull { it.permission == GeckoSession.PermissionDelegate.PERMISSION_TRACKING }
             }
             // Solo HTTPS: la web no tiene versión segura → preguntar en vez de mostrar un error.
@@ -281,6 +343,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 // #61: siempre una página de error. Si se devuelve null, Gecko para la carga y la pantalla queda en negro
                 // (pasaba con los certificados autofirmados de Proxmox y con cualquier fallo de red).
                 val page = GeckoResult.fromValue(ErrorPages.url(uri, e, private))
+                // Para la barra: un certificado roto se marca «No seguro»; un fallo de red, sin icono
+                uri?.let { errHost = History.hostOf(it).lowercase(); errKind = ErrorPages.info(e.code, "", false).kind }
                 if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return page
                 val host = History.hostOf(uri)
                 (tabHost as? PromptHost)?.show { close ->
@@ -355,17 +419,28 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
     }
 
-    val isHome get() = url.isBlank() || url == "about:blank"
+    val isHome get() = home
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
     /** Lo que se escribe a mano en la barra: pasa por toUrl() (dirección, red local o búsqueda). */
-    fun load(input: String) { pending = null; ensureOpen(); val u = toUrl(input, Settings.search); session.loadUri(u); url = u }
+    // #82: los botones de las extensiones también se escuchan por pestaña
+    init { bySession[session] = this; Extensions.attachSession(session) }
+
+    fun load(input: String) { pending = null; ensureOpen(); val u = toUrl(input, Settings.search); session.loadUri(u); url = u; home = false }
+
+    /** Cambia la dirección mostrada. El about:blank con el que arranca toda sesión no cuenta si ya se ha pedido otra web (#65). */
+    private fun setUrl(u: String): Boolean {
+        if (u == "about:blank" && url.isNotBlank() && url != "about:blank") return false
+        url = u
+        home = u.isBlank() || u == "about:blank"
+        return true
+    }
 
     /**
      * Direcciones que YA son direcciones (imágenes data:/blob:, favoritos, historial, páginas de extensiones):
      * se abren tal cual y nunca se mandan al buscador. Gecko decide si se pueden mostrar.
      */
-    fun open(address: String) { pending = null; ensureOpen(); session.loadUri(address); url = address }
+    fun open(address: String) { pending = null; ensureOpen(); session.loadUri(address); url = address; home = false }
 
     /** Modo lectura: lo monta la extensión dentro de la página; salir = recargar el original. */
     fun toggleReader() {
@@ -403,6 +478,29 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         if (!private) Thumbs.delete(ctx, id)
     }
 
+    /**
+     * Una web quiere instalar una extensión (#64). Como en Firefox: solo addons.mozilla.org instala directamente,
+     * y siempre tras un toque del usuario. Desde otra web, aviso de Brisa antes (Cancelar por defecto); en privadas, nada.
+     */
+    private fun xpi(uri: String) {
+        val gesture = System.currentTimeMillis() - lastGesture < 10_000
+        val toast = { m: String -> android.widget.Toast.makeText(ctx, m, android.widget.Toast.LENGTH_LONG).show() }
+        if (!gesture || xpiAsked) { if (!xpiAsked) toast("Brisa ha impedido que esta web instale una extensión"); xpiAsked = true; return }
+        xpiAsked = true
+        val amo = Extensions.isAmo(uri) && Extensions.isAmo(url)
+        if (amo) { Extensions.installUrl(ctx, uri); return }
+        if (private) { toast("En pestañas privadas no se instalan extensiones desde webs"); return }
+        val h = tabHost as? PromptHost ?: return
+        val site = History.hostOf(url).ifBlank { History.hostOf(uri) }
+        h.show { close ->
+            androidx.compose.material3.AlertDialog(onDismissRequest = close,
+                title = { androidx.compose.material3.Text("Esta web quiere instalar una extensión") },
+                text = { androidx.compose.material3.Text("$site no es la tienda de Mozilla. Las webs de estafas piden instalar extensiones (\"para ver el vídeo\", \"para descargar\"…). Instala solo extensiones de webs en las que confíes.") },
+                confirmButton = { androidx.compose.material3.TextButton(close) { androidx.compose.material3.Text("Cancelar") } },
+                dismissButton = { androidx.compose.material3.TextButton({ close(); Extensions.installUrl(ctx, uri) }) { androidx.compose.material3.Text("Continuar") } })
+        }
+    }
+
     /** Recuperar la pestaña tras caerse su proceso. Si no es la visible, se recarga cuando se vuelva a mirar. */
     private fun recover(reopen: Boolean) {
         val now = System.currentTimeMillis()
@@ -434,6 +532,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     }
 
     companion object {
+        /** Pestaña de cada sesión, para lo que Gecko avisa por sesión (botones de extensiones por pestaña). */
+        val bySession = java.util.WeakHashMap<GeckoSession, Tab>()
         /** Brisa está delante (entre onResume y onPause). */
         var foreground = false
         var tabHost: TabHost? = null
@@ -467,3 +567,6 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
     }
 }
+
+/** Seguridad de la página para la barra de direcciones. */
+enum class Security { NONE, SECURE, MIXED, HTTP, EXCEPTION, BROKEN }

@@ -321,3 +321,32 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Modo avión: «Sin conexión»; al volver la red, «Reintentar» carga la página.
 - [ ] «Solo HTTPS» activado y una web http://: sale la ventana de siempre y detrás la página explicándolo (no negro).
 - [ ] Tema oscuro: la página de error se ve bien.
+
+## 33. Novedades 1.1.2 · issues #64–#80
+- [ ] addons.mozilla.org → «Añadir a Firefox» en una extensión: instala como siempre (con la casilla «Permitir en pestañas privadas»).
+- [ ] Página de prueba que hace `location.href = "https://ejemplo.com/algo.xpi"` al cargar: no sale nada (solo el aviso «Brisa ha impedido…»).
+- [ ] Pestaña privada con una web llena de anuncios: limpia como en normal; el menú aA dice «X bloqueados (uBlock + Gecko)».
+- [ ] https://self-signed.badssl.com: sin candado en la página de error; tras aceptar, aviso rojo en la barra y la línea en el menú aA.
+- [ ] https://httpbin.org/redirect-to?url=https://example.com → la barra muestra example.com. En m.youtube.com, abrir dos vídeos y compartir: se comparte el segundo.
+- [ ] Brisa quitada de Recientes, abrir un enlace desde Telegram: no se ve Inicio en ningún momento.
+- [ ] 4 pestañas, `adb shell am send-trim-memory es.homelab.brisa COMPLETE`, volver: la cuadrícula tiene las 4 miniaturas.
+- [ ] Menú aA → botón de ClearURLs o Decentraleyes 10 veces seguidas: las 10 abre su ventanita. En horizontal, la ventanita cabe.
+- [ ] Mantener pulsado un favorito en Inicio: sale el menú; «Quitar de favoritos» lo quita.
+- [ ] Con TalkBack: el botón de pestañas dice «Pestañas abiertas: N»; el favorito dice «Añadir/Quitar de favoritos».
+
+## 34. Novedades 1.1.3 · issues #81 y #82
+- [ ] Instalar encima de la 1.1.2 conservando pestañas, favoritos y extensiones.
+- [ ] Menú aA → botón de uBlock: se abre su ventanita a la primera; repetir 10 veces, también en una pestaña nueva y en una privada. `adb logcat -s Brisa` muestra «clic en …» y luego «onTogglePopup»/«onOpenPopup».
+- [ ] Instalar una extensión nueva con pestañas ya abiertas: su botón abre la ventanita en esas pestañas sin reiniciar.
+- [ ] El contador de uBlock sigue saliendo en el botón y cambia al cambiar de pestaña.
+- [ ] Arrancar en frío varias veces (quitar de Recientes, abrir desde un enlace): las webs cargan. Si alguna vez se queda al 5 %, `adb logcat -d | grep -iE "extension|webext|spawn|Brisa|crash" | tail -n 200` y anotar si sale «Gecko ha dejado de arrancar el proceso de extensiones» / «Reactivando…».
+- [ ] Si sale el aviso «Las extensiones han dejado de funcionar»: «Reactivar» vuelve a cargar las webs con bloqueo; «Seguir sin extensiones» las carga sin bloqueo y al volver a Brisa se reactivan.
+
+## 35. Novedades 1.1.4 · aviso de sitio no seguro
+- [ ] http://neverssl.com: candado tachado y «No seguro» en gris en la barra; el menú aA dice «La conexión con … no es segura».
+- [ ] Una IP del homelab por http (`192.168.1.x`): «No seguro»; al tocarlo, la ficha añade que en la red local es habitual.
+- [ ] https://wikipedia.org: candado; al tocarlo, «La conexión es segura» y quién verifica el certificado. Tocar el nombre de la web sigue abriendo la edición de la barra.
+- [ ] https://self-signed.badssl.com: «No seguro» en rojo en la página de error; tras aceptar, «No seguro» en rojo con el escudo y la ficha lo explica.
+- [ ] https://mixed.badssl.com: candado abierto («segura solo en parte»).
+- [ ] Ir de una web https a una http y volver con Atrás/Adelante: el icono cambia cada vez y nunca se queda el anterior. En m.youtube.com, navegar entre vídeos: el candado no desaparece.
+- [ ] Barra encogida al bajar: se ve el icono correcto (candado / tachado / rojo).
