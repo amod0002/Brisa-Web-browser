@@ -341,3 +341,12 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] El contador de uBlock sigue saliendo en el botón y cambia al cambiar de pestaña.
 - [ ] Arrancar en frío varias veces (quitar de Recientes, abrir desde un enlace): las webs cargan. Si alguna vez se queda al 5 %, `adb logcat -d | grep -iE "extension|webext|spawn|Brisa|crash" | tail -n 200` y anotar si sale «Gecko ha dejado de arrancar el proceso de extensiones» / «Reactivando…».
 - [ ] Si sale el aviso «Las extensiones han dejado de funcionar»: «Reactivar» vuelve a cargar las webs con bloqueo; «Seguir sin extensiones» las carga sin bloqueo y al volver a Brisa se reactivan.
+
+## 35. Novedades 1.1.4 · aviso de sitio no seguro
+- [ ] http://neverssl.com: candado tachado y «No seguro» en gris en la barra; el menú aA dice «La conexión con … no es segura».
+- [ ] Una IP del homelab por http (`192.168.1.x`): «No seguro»; al tocarlo, la ficha añade que en la red local es habitual.
+- [ ] https://wikipedia.org: candado; al tocarlo, «La conexión es segura» y quién verifica el certificado. Tocar el nombre de la web sigue abriendo la edición de la barra.
+- [ ] https://self-signed.badssl.com: «No seguro» en rojo en la página de error; tras aceptar, «No seguro» en rojo con el escudo y la ficha lo explica.
+- [ ] https://mixed.badssl.com: candado abierto («segura solo en parte»).
+- [ ] Ir de una web https a una http y volver con Atrás/Adelante: el icono cambia cada vez y nunca se queda el anterior. En m.youtube.com, navegar entre vídeos: el candado no desaparece.
+- [ ] Barra encogida al bajar: se ve el icono correcto (candado / tachado / rojo).

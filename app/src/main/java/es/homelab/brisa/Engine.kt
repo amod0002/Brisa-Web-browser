@@ -204,11 +204,40 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     /** Es la página de Inicio. Va aparte de la URL (#65): al abrir la sesión Gecko pasa un instante por about:blank. */
     var home by mutableStateOf(startUrl.isNullOrBlank() || startUrl == "about:blank")
         private set
-    /** Seguridad real de la conexión, según Gecko (#73): candado solo si es segura; aviso si hay excepción de certificado. */
-    var secure by mutableStateOf(false)
+    /**
+     * Seguridad real de la conexión, según Gecko (#73). Lo que informa onSecurityChange se guarda junto con el
+     * host al que se refiere: Gecko no siempre lo manda después de onPageStart (atrás/adelante, caché, webs de una
+     * sola página), así que borrarlo al empezar cada carga dejaba el candado mal. Lo que se pinta sale de
+     * [security], que cruza la dirección actual con ese dato.
+     */
+    private var secHost by mutableStateOf<String?>(null)
+    private var secSecure by mutableStateOf(false)
+    private var secException by mutableStateOf(false)
+    private var secMixed by mutableStateOf(false)
+    /** Quién firma el certificado (para la ficha del sitio). */
+    var secIssuer by mutableStateOf<String?>(null)
         private set
-    var certException by mutableStateOf(false)
-        private set
+    /** Último error de carga (tipo de ErrorPages.Info.kind) y host en que pasó: un certificado roto se marca «No seguro». */
+    private var errHost by mutableStateOf<String?>(null)
+    private var errKind by mutableStateOf<String?>(null)
+    val certException get() = security == Security.EXCEPTION
+    val secure get() = security == Security.SECURE || security == Security.MIXED
+
+    /** Lo que se enseña en la barra, estilo Firefox/Chrome. */
+    val security: Security get() {
+        if (isHome) return Security.NONE
+        val u = url.lowercase()
+        val h = History.hostOf(url).lowercase()
+        return when {
+            u.startsWith("http://") -> Security.HTTP
+            !u.startsWith("https://") -> Security.NONE // páginas internas, de extensiones, data:…
+            secHost == h && secException -> Security.EXCEPTION
+            errHost == h && errKind in setOf("cert", "hsts", "ssl") -> Security.BROKEN
+            secHost == h && secSecure && secMixed -> Security.MIXED
+            secHost == h && secSecure -> Security.SECURE
+            else -> Security.NONE // aún sin datos de Gecko (cargando) o error de red
+        }
+    }
     /** Botones de las extensiones en ESTA pestaña (p. ej. el contador de uBlock, #67 #77), por id de extensión. */
     val extActions = androidx.compose.runtime.mutableStateMapOf<String, WebExtension.Action>()
     /** Ya se ha avisado de un .xpi en esta carga (#64): una web no puede encadenar avisos. */
@@ -244,11 +273,20 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         GeckoSessionSettings.Builder().usePrivateMode(private).build()
     )).apply {
         progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onPageStart(s: GeckoSession, u: String) { if (!setUrl(u)) return; progress = 5; xpiAsked = false; secure = false; certException = false; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
+            override fun onPageStart(s: GeckoSession, u: String) { if (!setUrl(u)) return; progress = 5; xpiAsked = false; if (errHost != History.hostOf(u).lowercase()) { errHost = null; errKind = null }; blocked = 0; readerable = false; reading = false; prompts.resetDialogs(u) }
             override fun onProgressChange(s: GeckoSession, p: Int) { progress = p }
             override fun onPageStop(s: GeckoSession, ok: Boolean) { progress = 100; if (!isHome) painted = true; Privacy.restoreAfterLoad(ctx, s) }
             override fun onSecurityChange(s: GeckoSession, info: GeckoSession.ProgressDelegate.SecurityInformation) {
-                secure = info.isSecure; certException = info.isException
+                val h = (info.host?.takeIf { it.isNotBlank() } ?: History.hostOf(info.origin ?: url)).lowercase()
+                secHost = h; secSecure = info.isSecure; secException = info.isException
+                // Contenido http dentro de una web https (imágenes, scripts…): candado con aviso, como Firefox
+                secMixed = info.mixedModeActive == GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED ||
+                    info.mixedModePassive == GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED
+                secIssuer = info.certificate?.let { c -> runCatching {
+                    val dn = c.issuerX500Principal.name
+                    Regex("(?:^|,)O=([^,]+)").find(dn)?.groupValues?.get(1) ?: Regex("CN=([^,]+)").find(dn)?.groupValues?.get(1)
+                }.getOrNull() }
+                if (info.isSecure && errHost == h) { errHost = null; errKind = null }
             }
             override fun onSessionStateChange(s: GeckoSession, st: GeckoSession.SessionState) { lastState = st; if (!private) state = st.toString() }
         }
@@ -305,6 +343,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
                 // #61: siempre una página de error. Si se devuelve null, Gecko para la carga y la pantalla queda en negro
                 // (pasaba con los certificados autofirmados de Proxmox y con cualquier fallo de red).
                 val page = GeckoResult.fromValue(ErrorPages.url(uri, e, private))
+                // Para la barra: un certificado roto se marca «No seguro»; un fallo de red, sin icono
+                uri?.let { errHost = History.hostOf(it).lowercase(); errKind = ErrorPages.info(e.code, "", false).kind }
                 if (e.code != org.mozilla.geckoview.WebRequestError.ERROR_HTTPS_ONLY || uri == null) return page
                 val host = History.hostOf(uri)
                 (tabHost as? PromptHost)?.show { close ->
@@ -527,3 +567,6 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
         }
     }
 }
+
+/** Seguridad de la página para la barra de direcciones. */
+enum class Security { NONE, SECURE, MIXED, HTTP, EXCEPTION, BROKEN }

@@ -149,8 +149,10 @@ fun AddressBar(tab: Tab, editing: Boolean, setEditing: (Boolean) -> Unit, onMenu
                 Icon(Icons.Outlined.Description, if (tab.reading) "Salir del modo lectura" else "Modo lectura",
                     tint = if (tab.reading) MaterialTheme.colorScheme.primary else tint, modifier = Modifier.size(20.dp))
             }
+            var siteInfo by remember { mutableStateOf(false) }
+            if (siteInfo) SiteInfoSheet(tab) { siteInfo = false }
             Row(Modifier.weight(1f).clickable { setEditing(true) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                SecurityIcon(tab, 14.dp, tint)
+                SecurityIcon(tab, 14.dp, tint, label = true) { siteInfo = true }
                 Text(if (tab.isHome) "Buscar o escribir web" else tab.host, color = if (tab.isHome) tint else strong, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp))
             }
@@ -367,13 +369,80 @@ fun LockedBar(tabCount: Int, onUnlock: () -> Unit, onTabs: () -> Unit) {
 }
 
 /**
- * Candado según la seguridad real que informa Gecko (#73), no según si la dirección empieza por https:
- * candado si es segura; aviso si se ha aceptado un certificado no válido; nada en http o páginas de error.
+ * Seguridad de la página en la barra, estilo Firefox/Chrome (#73), según lo que informa Gecko y no según el texto:
+ * - https verificado: candado (con un aviso pequeño si la web carga partes por http).
+ * - http: candado tachado y «No seguro» en gris.
+ * - Certificado no válido o aceptado a mano: «No seguro» en rojo.
+ * Con [label] se escribe «No seguro» al lado (barra completa); sin él, solo el icono (barra encogida).
  */
 @Composable
-fun SecurityIcon(tab: Tab, size: androidx.compose.ui.unit.Dp, tint: androidx.compose.ui.graphics.Color) {
-    when {
-        tab.certException -> Icon(Icons.Outlined.GppMaybe, "Excepción de certificado", Modifier.size(size), tint = MaterialTheme.colorScheme.error)
-        tab.secure && !tab.isHome -> Icon(Icons.Filled.Lock, "Conexión segura", Modifier.size(size), tint = tint)
+fun SecurityIcon(tab: Tab, size: androidx.compose.ui.unit.Dp, tint: androidx.compose.ui.graphics.Color, label: Boolean = false,
+                 onClick: (() -> Unit)? = null) {
+    val sec = tab.security
+    if (sec == Security.NONE) return
+    val red = MaterialTheme.colorScheme.error
+    val (icon, color, desc) = when (sec) {
+        Security.SECURE -> Triple(Icons.Filled.Lock, tint, "Conexión segura")
+        Security.MIXED -> Triple(Icons.Outlined.LockOpen, tint, "Conexión segura solo en parte")
+        Security.HTTP -> Triple(Icons.Outlined.NoEncryption, tint, "No seguro")
+        Security.EXCEPTION -> Triple(Icons.Outlined.GppMaybe, red, "No seguro: certificado aceptado a mano")
+        Security.BROKEN -> Triple(Icons.Outlined.GppBad, red, "No seguro: certificado no válido")
+        Security.NONE -> return
+    }
+    val notSecure = sec == Security.HTTP || sec == Security.EXCEPTION || sec == Security.BROKEN
+    Row(
+        (if (onClick != null) Modifier.clip(RoundedCornerShape(50)).clickable(onClickLabel = "Información del sitio", onClick = onClick) else Modifier)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .clearAndSetSemantics { contentDescription = desc },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, Modifier.size(size), tint = color)
+        if (label && notSecure) {
+            Text("No seguro", color = color, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+            Box(Modifier.padding(start = 8.dp).size(width = 1.dp, height = 14.dp).background(tint.copy(alpha = 0.4f)))
+        }
+    }
+}
+
+/** Ficha «Información del sitio» al tocar el candado o el «No seguro», como en Firefox y Chrome. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteInfoSheet(tab: Tab, dismiss: () -> Unit) {
+    val sec = tab.security
+    val host = tab.host
+    val local = Privacy.isLocal(History.hostOf(tab.url))
+    val red = MaterialTheme.colorScheme.error
+    ModalBottomSheet(onDismissRequest = dismiss) {
+        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SiteIcon(host, 32.dp)
+                Text(host, Modifier.padding(start = 12.dp), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(16.dp))
+            val (icon, color, title, body) = when (sec) {
+                Security.SECURE -> listOf(Icons.Filled.Lock, LocalContentColor.current, "La conexión es segura",
+                    "Lo que envíes a esta web (contraseñas, tarjetas…) viaja cifrado y nadie de tu red puede leerlo." +
+                        (tab.secIssuer?.let { "\n\nCertificado verificado por $it." } ?: ""))
+                Security.MIXED -> listOf(Icons.Outlined.LockOpen, LocalContentColor.current, "La conexión es segura solo en parte",
+                    "La página va cifrada, pero carga algunas partes (imágenes, vídeos…) sin cifrar. Alguien de tu red podría ver o cambiar esas partes.")
+                Security.HTTP -> listOf(Icons.Outlined.NoEncryption, LocalContentColor.current, "La conexión no es segura",
+                    "Esta web no usa cifrado. No escribas contraseñas, tarjetas ni datos personales: cualquiera en tu red (o en la Wi-Fi pública) podría verlos o cambiar la página." +
+                        (if (local) "\n\nEstá en tu red local: en el router, Proxmox o un NAS es habitual. Si el servicio permite https, mejor usarlo." else ""))
+                Security.EXCEPTION -> listOf(Icons.Outlined.GppMaybe, red, "No seguro: has aceptado un certificado no válido",
+                    "La conexión está cifrada, pero Brisa no puede comprobar quién hay al otro lado." +
+                        (if (local) " En tu red local suele ser tu propio servidor con certificado autofirmado." else " Si no sabes por qué pasa, no escribas datos en esta web."))
+                Security.BROKEN -> listOf(Icons.Outlined.GppBad, red, "No seguro: el certificado no es válido",
+                    "Brisa no ha abierto la web porque su certificado no es válido: podría ser un intento de suplantarla.")
+                Security.NONE -> listOf(Icons.Outlined.Info, LocalContentColor.current, "Página de Brisa o aún cargando",
+                    "Todavía no hay datos de seguridad para esta página.")
+            }
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(icon as androidx.compose.ui.graphics.vector.ImageVector, null, Modifier.size(22.dp), tint = color as androidx.compose.ui.graphics.Color)
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text(title as String, fontWeight = FontWeight.Medium, color = color)
+                    Text(body as String, Modifier.padding(top = 4.dp), fontSize = 14.sp, color = LocalContentColor.current.copy(alpha = 0.8f))
+                }
+            }
+        }
     }
 }

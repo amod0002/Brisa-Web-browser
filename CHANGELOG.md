@@ -2,6 +2,11 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.4 · aviso de sitio no seguro, estilo Firefox/Chrome
+- **«No seguro» en la barra**: las webs http muestran un candado tachado y «No seguro»; con un certificado no válido o aceptado a mano, «No seguro» en rojo. Las https verificadas, su candado (con aviso si cargan partes sin cifrar).
+- **Información del sitio**: al tocar el candado o el «No seguro» se abre una ficha que explica la conexión (y quién firma el certificado). El menú aA también avisa en webs http.
+- **Candado fiable**: lo que dice Gecko se guarda con el host al que se refiere, así que ya no desaparece ni se queda puesto al ir atrás o adelante, en webs de una sola página o tras una redirección.
+
 ## 1.1.3 · botones de extensiones y extensiones que se quedan sin proceso (issues #81, #82, gracias @perritys)
 - **Botones de extensiones** (#82): el delegado de los botones se registra también en cada pestaña, que es por donde Gecko pide abrir la ventanita al tocarlos. Antes esa petición se perdía sin avisar.
 - **Webs que no cargan en frío** (#81): si Android mata varias veces el proceso de las extensiones y Gecko deja de arrancarlo, Brisa lo reactiva sola una vez (también al volver a la app); si vuelve a caerse, avisa con «Reactivar» o «Seguir sin extensiones». Queda anotado en el registro (`adb logcat -s Brisa`).

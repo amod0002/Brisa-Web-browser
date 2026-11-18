@@ -72,6 +72,10 @@ fun PageMenu(tab: Tab, dismiss: () -> Unit, newPrivate: () -> Unit, openHistory:
             if (tab.certException) ListItem(leadingContent = { Icon(Icons.Outlined.GppMaybe, null, tint = MaterialTheme.colorScheme.error) },
                 headlineContent = { Text("Has aceptado un certificado no válido para este sitio") },
                 supportingContent = { Text("La conexión está cifrada, pero Brisa no puede comprobar quién hay al otro lado") })
+            // Web sin cifrar (http): el mismo aviso que en la barra
+            if (tab.security == Security.HTTP) ListItem(leadingContent = { Icon(Icons.Outlined.NoEncryption, null) },
+                headlineContent = { Text("La conexión con ${tab.host} no es segura") },
+                supportingContent = { Text("No escribas contraseñas ni datos personales en esta web") })
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Tamaño del texto", Modifier.weight(1f))
                 OutlinedButton({ size = (size - 0.1f).coerceAtLeast(0.8f); Engine.setTextSize(ctx, size) }) { Text("A", fontSize = 13.sp) }
