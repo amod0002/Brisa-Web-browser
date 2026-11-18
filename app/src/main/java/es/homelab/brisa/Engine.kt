@@ -383,7 +383,8 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     val host get() = url.substringAfter("://").substringBefore("/").removePrefix("www.")
 
     /** Lo que se escribe a mano en la barra: pasa por toUrl() (dirección, red local o búsqueda). */
-    init { bySession[session] = this }
+    // #82: los botones de las extensiones también se escuchan por pestaña
+    init { bySession[session] = this; Extensions.attachSession(session) }
 
     fun load(input: String) { pending = null; ensureOpen(); val u = toUrl(input, Settings.search); session.loadUri(u); url = u; home = false }
 

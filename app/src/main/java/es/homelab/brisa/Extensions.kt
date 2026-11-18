@@ -51,10 +51,74 @@ object Extensions {
             override fun onInstalled(extension: WebExtension) { attach(extension); refresh() }
             override fun onReady(extension: WebExtension) { attach(extension) }
             override fun onEnabled(extension: WebExtension) { attach(extension); refresh() }
-            override fun onDisabled(extension: WebExtension) { actions.remove(extension.id); closePopupOf(extension); refresh() }
-            override fun onUninstalled(extension: WebExtension) { actions.remove(extension.id); closePopupOf(extension); refresh() }
+            override fun onDisabled(extension: WebExtension) { forget(extension); refresh() }
+            override fun onUninstalled(extension: WebExtension) { forget(extension); refresh() }
+        })
+        // #81: si Android mata varias veces el proceso de las extensiones, Gecko deja de arrancarlo y avisa aquí
+        c.setExtensionProcessDelegate(object : WebExtensionController.ExtensionProcessDelegate {
+            override fun onDisabledProcessSpawning() { main.post { onProcessStopped() } }
         })
         refresh(attachAll = true)
+    }
+
+    private fun forget(e: WebExtension) {
+        actions.remove(e.id); attached.remove(e.id); closePopupOf(e)
+        Tab.bySession.values.forEach { it.extActions.remove(e.id) }
+    }
+
+    // ---- Proceso de las extensiones (#81) ----
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    /** Gecko ha dejado de arrancar el proceso de las extensiones: uBlock no responde y las webs pueden quedarse colgadas. */
+    var processStopped by mutableStateOf(false)
+        private set
+    /** Ya se ha reactivado solo una vez en esta visita a la app: si vuelve a caerse, se pregunta. */
+    private var autoRetried = false
+    private var asking = false
+
+    private fun onProcessStopped() {
+        android.util.Log.w("Brisa", "Gecko ha dejado de arrancar el proceso de extensiones (delante=${Tab.foreground}, ya reactivado=$autoRetried)")
+        processStopped = true
+        when {
+            // En segundo plano: se reactiva al volver (onForeground)
+            !Tab.foreground -> Unit
+            !autoRetried -> { autoRetried = true; reenable("automático") }
+            else -> ask()
+        }
+    }
+
+    /** Brisa vuelve a primer plano (MainActivity.onStart): si el proceso estaba parado, se reactiva una vez sin preguntar. */
+    fun onForeground() {
+        autoRetried = false
+        if (!::controller.isInitialized || !processStopped || asking) return
+        autoRetried = true
+        reenable("al volver a Brisa")
+    }
+
+    private fun reenable(why: String) {
+        android.util.Log.i("Brisa", "Reactivando el proceso de extensiones ($why)")
+        processStopped = false
+        runCatching { controller.enableExtensionProcessSpawning() }.onFailure { android.util.Log.w("Brisa", "enableExtensionProcessSpawning", it) }
+    }
+
+    private fun ask() {
+        val h = Tab.tabHost as? PromptHost ?: return
+        if (asking) return
+        asking = true
+        h.show { close ->
+            fun done() { asking = false; close() }
+            androidx.compose.material3.AlertDialog(onDismissRequest = { done() },
+                title = { androidx.compose.material3.Text("Las extensiones han dejado de funcionar") },
+                text = { androidx.compose.material3.Text("Android ha cerrado varias veces el proceso de las extensiones y el motor ha dejado de arrancarlo. " +
+                    "Mientras tanto las webs pueden no cargar, porque uBlock no responde.\n\n" +
+                    "«Seguir sin extensiones» deja cargar las webs sin bloqueo hasta la próxima vez que abras Brisa.") },
+                confirmButton = { androidx.compose.material3.TextButton({ reenable("el usuario"); done() }) { androidx.compose.material3.Text("Reactivar") } },
+                dismissButton = { androidx.compose.material3.TextButton({
+                    android.util.Log.i("Brisa", "Seguir sin extensiones")
+                    runCatching { controller.disableExtensionProcessSpawning() }
+                    done()
+                }) { androidx.compose.material3.Text("Seguir sin extensiones") } })
+        }
     }
 
     private fun isMine(e: WebExtension) = !e.isBuiltIn && e.id !in INTERNAL
@@ -75,25 +139,47 @@ object Extensions {
         }, { })
     }
 
+    /**
+     * Botón y ventanita de las extensiones. Gecko avisa por dos canales (#82): el del botón por defecto
+     * (WebExtension.setActionDelegate, session == null) y el de cada pestaña
+     * (session.webExtensionController.setActionDelegate). Al tocar el botón, la petición de abrir la
+     * ventanita llega por el canal de la pestaña con foco: sin delegado allí, Gecko la descarta sin avisar.
+     * Por eso el mismo delegado se registra en los dos sitios, como hace Firefox para Android.
+     */
+    private val actionDelegate = object : WebExtension.ActionDelegate {
+        // Por defecto (session == null) o por pestaña (p. ej. el contador de uBlock, #67 #77)
+        override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
+            if (session == null) actions[extension.id] = action
+            else Tab.bySession[session]?.extActions?.put(extension.id, action)
+        }
+        override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
+            android.util.Log.d("Brisa", "onTogglePopup ${extension.id}")
+            return if (popup?.ext?.id == extension.id) { closePopup(); null } else openPopup(extension)
+        }
+        override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
+            android.util.Log.d("Brisa", "onOpenPopup ${extension.id}")
+            return openPopup(extension)
+        }
+    }
+
+    /** Extensiones del usuario ya preparadas, para registrarlas también en las pestañas nuevas (#82). */
+    private val attached = linkedMapOf<String, WebExtension>()
+
+    /** Pestaña nueva: recibe el delegado de los botones de todas las extensiones (#82). */
+    fun attachSession(s: GeckoSession) { attached.values.forEach { bind(s, it) } }
+
+    private fun bind(s: GeckoSession, e: WebExtension) {
+        runCatching { s.webExtensionController.setActionDelegate(e, actionDelegate) }
+            .onFailure { android.util.Log.w("Brisa", "setActionDelegate por pestaña ${e.id}", it) }
+    }
+
     /** Lo que la extensión necesita para usarse: botón, ventanita y pestañas propias. */
     private fun attach(e: WebExtension) {
         if (!isMine(e)) return
-        e.setActionDelegate(object : WebExtension.ActionDelegate {
-            // Botón por defecto de la extensión (session == null). Los cambios por pestaña (p. ej. un contador) aún no se muestran.
-            // Por pestaña (session != null): p. ej. el contador de uBlock (#67 #77)
-            override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
-                if (session == null) actions[extension.id] = action
-                else Tab.bySession[session]?.extActions?.put(extension.id, action)
-            }
-            override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
-                android.util.Log.d("Brisa", "onTogglePopup ${extension.id}")
-                return if (popup?.ext?.id == extension.id) { closePopup(); null } else openPopup(extension)
-            }
-            override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
-                android.util.Log.d("Brisa", "onOpenPopup ${extension.id}")
-                return openPopup(extension)
-            }
-        })
+        attached[e.id] = e
+        e.setActionDelegate(actionDelegate)
+        // También en las pestañas que ya existen (al instalar o activar una extensión con pestañas abiertas)
+        Tab.bySession.keys.toList().forEach { bind(it, e) }
         e.setTabDelegate(object : WebExtension.TabDelegate {
             // La extensión abre una pestaña suya (bienvenida, ajustes, una web…): Gecko abre la sesión
             override fun onNewTab(source: WebExtension, createDetails: WebExtension.CreateTabDetails): GeckoResult<GeckoSession>? {

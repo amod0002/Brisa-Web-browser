@@ -273,6 +273,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     override fun onStart() {
         super.onStart()
         wipeIfAway()
+        Extensions.onForeground() // #81: reactiva el proceso de extensiones si Gecko lo había parado
         if (ownScreen && System.currentTimeMillis() - stoppedAt > 120_000) {
             if (Privacy.lockPrivate && tabs.any { it.private }) ui.privateLocked = true
             Secrets.relock++

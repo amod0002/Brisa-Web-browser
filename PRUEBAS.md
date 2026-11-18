@@ -333,3 +333,11 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] Menú aA → botón de ClearURLs o Decentraleyes 10 veces seguidas: las 10 abre su ventanita. En horizontal, la ventanita cabe.
 - [ ] Mantener pulsado un favorito en Inicio: sale el menú; «Quitar de favoritos» lo quita.
 - [ ] Con TalkBack: el botón de pestañas dice «Pestañas abiertas: N»; el favorito dice «Añadir/Quitar de favoritos».
+
+## 34. Novedades 1.1.3 · issues #81 y #82
+- [ ] Instalar encima de la 1.1.2 conservando pestañas, favoritos y extensiones.
+- [ ] Menú aA → botón de uBlock: se abre su ventanita a la primera; repetir 10 veces, también en una pestaña nueva y en una privada. `adb logcat -s Brisa` muestra «clic en …» y luego «onTogglePopup»/«onOpenPopup».
+- [ ] Instalar una extensión nueva con pestañas ya abiertas: su botón abre la ventanita en esas pestañas sin reiniciar.
+- [ ] El contador de uBlock sigue saliendo en el botón y cambia al cambiar de pestaña.
+- [ ] Arrancar en frío varias veces (quitar de Recientes, abrir desde un enlace): las webs cargan. Si alguna vez se queda al 5 %, `adb logcat -d | grep -iE "extension|webext|spawn|Brisa|crash" | tail -n 200` y anotar si sale «Gecko ha dejado de arrancar el proceso de extensiones» / «Reactivando…».
+- [ ] Si sale el aviso «Las extensiones han dejado de funcionar»: «Reactivar» vuelve a cargar las webs con bloqueo; «Seguir sin extensiones» las carga sin bloqueo y al volver a Brisa se reactivan.

@@ -62,6 +62,7 @@ fun ExtensionActions(onAction: () -> Unit) {
             FilledTonalButton({
                 // #67: Gecko abre la ventanita en la pestaña con foco; la hoja «aA» se lo ha quitado a la vista
                 Tab.visible?.session?.takeIf { it.isOpen }?.setFocused(true)
+                android.util.Log.d("Brisa", "clic en ${e.id} (botón ${if (Tab.visible?.extActions?.containsKey(e.id) == true) "de la pestaña" else "por defecto"})")
                 onAction(); a.click()
             }, enabled = a.enabled != false,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {

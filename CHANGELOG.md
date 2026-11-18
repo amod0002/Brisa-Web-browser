@@ -2,6 +2,10 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.3 · botones de extensiones y extensiones que se quedan sin proceso (issues #81, #82, gracias @perritys)
+- **Botones de extensiones** (#82): el delegado de los botones se registra también en cada pestaña, que es por donde Gecko pide abrir la ventanita al tocarlos. Antes esa petición se perdía sin avisar.
+- **Webs que no cargan en frío** (#81): si Android mata varias veces el proceso de las extensiones y Gecko deja de arrancarlo, Brisa lo reactiva sola una vez (también al volver a la app); si vuelve a caerse, avisa con «Reactivar» o «Seguir sin extensiones». Queda anotado en el registro (`adb logcat -s Brisa`).
+
 ## 1.1.2 · seguridad de extensiones, candado real y arreglos (issues #64–#67, #69, #72, #73, #75–#80, gracias @perritys)
 - **Instalar extensiones desde webs** (#64): solo addons.mozilla.org instala directamente y siempre tras un toque. Cualquier otra web muestra antes un aviso de Brisa (con «Cancelar» por defecto); sin toque o en privadas, no se instala nada.
 - **Red local** (#76): `10.ejemplo.com` o `192.168.algo.org` ya no cuentan como «tu red»; solo IPs privadas de verdad y dominios locales.
