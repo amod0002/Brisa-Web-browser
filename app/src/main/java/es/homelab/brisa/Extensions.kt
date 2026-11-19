@@ -404,7 +404,7 @@ object Extensions {
 
     /** Quita un permiso opcional ya concedido (pantalla de extensiones, #70). */
     fun removeOptional(e: WebExtension, perm: String?, origin: String?) {
-        controller.removeOptionalPermissions(e, perm?.let { arrayOf(it) } ?: emptyArray(), origin?.let { arrayOf(it) } ?: emptyArray(), emptyArray())
+        controller.removeOptionalPermissions(e.id, perm?.let { arrayOf(it) } ?: emptyArray(), origin?.let { arrayOf(it) } ?: emptyArray(), emptyArray())
             .accept({ refresh() }, { err -> android.util.Log.w("Brisa", "removeOptionalPermissions ${e.id}", err); refresh() })
     }
 
