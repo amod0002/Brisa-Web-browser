@@ -108,7 +108,13 @@ fun ExtensionsSheet(dismiss: () -> Unit, openTab: (String) -> Unit) {
             Text("Solo se instalan extensiones firmadas por Mozilla. Antes de instalar, Brisa te enseña qué permisos piden.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
 
-            if (Extensions.list.isNotEmpty()) Text("Instaladas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            if (Extensions.list.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Instaladas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                // #68: las extensiones se actualizan solas una vez al día; aquí, al momento
+                TextButton({ Extensions.checkUpdates(manual = true, ctx = ctx) }, enabled = !Extensions.checking) {
+                    Text(if (Extensions.checking) "Buscando…" else "Buscar actualizaciones")
+                }
+            }
             Extensions.list.forEach { e ->
                 val m = e.metaData
                 var open by remember(e.id) { mutableStateOf(false) }
@@ -137,6 +143,17 @@ fun ExtensionsSheet(dismiss: () -> Unit, openTab: (String) -> Unit) {
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Permitir en pestañas privadas", Modifier.weight(1f), fontSize = 14.sp)
                             Switch(m.allowedInPrivateBrowsing, { Extensions.setPrivate(e, it) })
+                        }
+                        // #70: permisos opcionales concedidos, con la opción de quitarlos
+                        val granted = m.grantedOptionalPermissions.map { it to null } + m.grantedOptionalOrigins.map { null to it }
+                        if (granted.isNotEmpty()) {
+                            Text("Permisos concedidos después de instalar", fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
+                            granted.forEach { (perm, origin) ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(Extensions.permLabel(perm, origin), Modifier.weight(1f), fontSize = 13.sp)
+                                    TextButton({ Extensions.removeOptional(e, perm, origin) }) { Text("Quitar") }
+                                }
+                            }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (m.optionsPageUrl != null) OutlinedButton({ dismiss(); Extensions.openOptions(e) }) { Text("Opciones") }

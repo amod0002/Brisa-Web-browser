@@ -2,6 +2,13 @@
 
 Historial de versiones de Brisa, de la más reciente a la más antigua. Las descargas están en [Releases](../../releases).
 
+## 1.1.5 · Gecko 160 (parche), extensiones al día y pantalla que sobrevive a Android (issues #68, #70, #71, #74, #83, gracias @perritys)
+- **Motor** (#83): GeckoView 160.0.20261116130455, con los últimos parches de seguridad de Mozilla.
+- **Extensiones que se actualizan** (#68): Brisa busca versiones nuevas una vez al día (uBlock incluido) y hay un botón «Buscar actualizaciones» en la pantalla de extensiones. Si una versión nueva pide más permisos, se pregunta en vez de quedarse sin actualizar.
+- **Permisos opcionales** (#70): cuando una extensión pide un permiso al activar una función, Brisa pregunta. Los concedidos se ven y se pueden quitar en su ficha.
+- **DNS cifrado estricto** (#71): al cambiar de red ya no sale ninguna consulta sin cifrar mientras se reinicia la conexión con el servidor.
+- **Cambios de idioma, letra o «No mantener actividades»** (#74): las pestañas (también las privadas) siguen abiertas sin duplicar el enlace con que se abrió Brisa ni dejar sesiones sonando sin pantalla; «Borrar datos al salir» ya no salta por eso. Brisa vuelve a la pestaña que estabas viendo, también tras «Reiniciar Brisa».
+
 ## 1.1.4 · aviso de sitio no seguro, estilo Firefox/Chrome
 - **«No seguro» en la barra**: las webs http muestran un candado tachado y «No seguro»; con un certificado no válido o aceptado a mano, «No seguro» en rojo. Las https verificadas, su candado (con aviso si cargan partes sin cifrar).
 - **Información del sitio**: al tocar el candado o el «No seguro» se abre una ficha que explica la conexión (y quién firma el certificado). El menú aA también avisa en webs http.

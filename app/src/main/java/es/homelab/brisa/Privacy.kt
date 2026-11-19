@@ -119,13 +119,25 @@ object Privacy {
         pushToExtension()
     }
 
+    private var dnsResets = 0
+
     /**
-     * La red ha cambiado (#59): se apaga el DNS cifrado y se vuelve a encender. Gecko vacía así su caché de
-     * DNS cifrado y no sigue esperando respuestas por la conexión de antes (p. ej. la que iba por la VPN).
+     * La red ha cambiado (#59): Gecko tiene que soltar la conexión de antes con el DNS cifrado (p. ej. la que iba por
+     * la VPN) y vaciar su caché.
+     * - Automático: se apaga el DNS cifrado y se vuelve a encender (mientras tanto puede usar el DNS normal, como ya permite).
+     * - Estricto (#71): nunca se pasa por «apagado», que mandaría las consultas sin cifrar justo cuando más se hacen.
+     *   Se cambia un instante la dirección del servidor por la misma con un parámetro distinto (Gecko reinicia el DNS
+     *   cifrado al cambiar la dirección) y luego se vuelve a la buena, siempre en modo «solo DNS cifrado».
      */
     fun resetDns(ctx: Context) {
         if (dohMode == 0 || insecureOnce) return
-        Engine.get(ctx).settings.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_DISABLED)
+        val s = Engine.get(ctx).settings
+        if (dohMode == 2) {
+            val sep = if (dohUri.contains('?')) '&' else '?'
+            s.setTrustedRecursiveResolverUri("$dohUri${sep}brisa=${++dnsResets}")
+        } else {
+            s.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_DISABLED)
+        }
         main.postDelayed({ if (!insecureOnce) apply(ctx) }, 300)
     }
 
