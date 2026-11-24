@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
@@ -59,6 +60,8 @@ object Extensions {
             override fun onDisabledProcessSpawning() { main.post { onProcessStopped() } }
         })
         refresh(attachAll = true)
+        // #68: buscar actualizaciones poco después de arrancar (si hace más de un día de la última vez)
+        main.postDelayed({ checkUpdates() }, 30_000)
     }
 
     private fun forget(e: WebExtension) {
@@ -90,6 +93,7 @@ object Extensions {
 
     /** Brisa vuelve a primer plano (MainActivity.onStart): si el proceso estaba parado, se reactiva una vez sin preguntar. */
     fun onForeground() {
+        checkUpdates() // #68: una vez al día como mucho
         autoRetried = false
         if (!::controller.isInitialized || !processStopped || asking) return
         autoRetried = true
@@ -312,5 +316,100 @@ object Extensions {
     }
 
     private fun toast(ctx: Context, s: String) = android.widget.Toast.makeText(ctx, s, android.widget.Toast.LENGTH_SHORT).show()
+
+    // ---- Actualizaciones (#68) ----
+
+    private const val UPDATE_EVERY = 24 * 60 * 60_000L
+    /** Buscando actualizaciones ahora mismo (para el botón de la pantalla de extensiones). */
+    var checking by mutableStateOf(false)
+        private set
+
+    /**
+     * GeckoView no actualiza las extensiones por su cuenta: hay que pedírselo (WebExtensionController.update).
+     * Sola, una vez al día como mucho (al arrancar y al volver a Brisa); con [manual], al tocar «Buscar actualizaciones».
+     * Si una versión nueva pide permisos nuevos, Gecko llama a onUpdatePrompt (Engine), que pregunta al usuario.
+     */
+    fun checkUpdates(manual: Boolean = false, ctx: Context? = null) {
+        if (!::controller.isInitialized || checking) return
+        val p = app.getSharedPreferences("ajustes", 0)
+        val now = System.currentTimeMillis()
+        if (!manual && now - p.getLong("ext_actualizadas", 0) < UPDATE_EVERY) return
+        checking = true
+        p.edit().putLong("ext_actualizadas", now).apply()
+        controller.list().accept({ l ->
+            val mine = l.orEmpty().filter(::isMine)
+            if (mine.isEmpty()) { checking = false; if (manual && ctx != null) toast(ctx, "No hay extensiones instaladas"); return@accept }
+            var pending = mine.size
+            val updated = mutableListOf<String>()
+            var failed = 0
+            fun one() {
+                if (--pending > 0) return
+                checking = false; refresh()
+                android.util.Log.i("Brisa", "Actualizaciones de extensiones: ${updated.size} actualizadas, $failed con error")
+                val msg = when {
+                    updated.isNotEmpty() -> "Actualizadas: ${updated.joinToString(", ")}"
+                    failed > 0 -> "No se ha podido comprobar alguna extensión. Se volverá a intentar."
+                    else -> "Todas las extensiones están al día"
+                }
+                if (manual && ctx != null) toast(ctx, msg)
+                else if (updated.isNotEmpty()) toast(app, "Extensiones actualizadas: ${updated.joinToString(", ")}")
+            }
+            mine.forEach { e ->
+                controller.update(e).accept({ n ->
+                    if (n != null && n.metaData.version != e.metaData.version) { updated += (n.metaData.name ?: n.id) + " " + n.metaData.version; attach(n) }
+                    one()
+                }, { err ->
+                    failed++; android.util.Log.w("Brisa", "Actualizar ${e.id}", err); one()
+                })
+            }
+        }, { checking = false })
+    }
+
+    // ---- Permisos (#68 y #70) ----
+
+    private val PERM_NAMES = mapOf(
+        "tabs" to "ver tus pestañas", "activeTab" to "la pestaña actual", "downloads" to "descargas",
+        "clipboardRead" to "leer el portapapeles", "clipboardWrite" to "escribir en el portapapeles",
+        "history" to "historial", "bookmarks" to "favoritos", "notifications" to "notificaciones",
+        "cookies" to "cookies", "storage" to "guardar datos", "webRequest" to "ver las peticiones de las webs",
+        "webRequestBlocking" to "bloquear peticiones de las webs", "webNavigation" to "saber qué webs visitas",
+        "privacy" to "ajustes de privacidad", "geolocation" to "ubicación", "nativeMessaging" to "hablar con otras apps",
+        "scripting" to "cambiar las webs", "contextMenus" to "menú contextual", "management" to "ver otras extensiones",
+    )
+
+    /** Texto de los permisos para los diálogos. */
+    fun describe(perms: Array<String>, origins: Array<String>): String {
+        val all = origins.any { it == "<all_urls>" || it.startsWith("*://*/") }
+        val names = perms.map { PERM_NAMES[it] ?: it } + origins.filter { it != "<all_urls>" && !it.startsWith("*://*/") }
+            .map { History.hostOf(it.replace("*.", "")).ifEmpty { it } }
+        return (if (all) "Podrá leer y cambiar todo lo que veas en todas las webs.\n\n" else "") +
+            "Permisos: " + (if (all) names + "todas las webs" else names).joinToString(", ").ifEmpty { "ninguno" }
+    }
+
+    /** Pregunta al usuario por unos permisos (actualización con permisos nuevos, o permisos opcionales). Sin pantalla, se deniega. */
+    fun askPermissions(title: String, perms: Array<String>, origins: Array<String>, allow: String = "Permitir"): GeckoResult<AllowOrDeny> {
+        val h = Tab.tabHost as? PromptHost ?: return GeckoResult.fromValue(AllowOrDeny.DENY)
+        val r = GeckoResult<AllowOrDeny>()
+        var answered = false
+        fun answer(ok: Boolean) { if (!answered) { answered = true; r.complete(if (ok) AllowOrDeny.ALLOW else AllowOrDeny.DENY) } }
+        h.show { close ->
+            androidx.compose.material3.AlertDialog(onDismissRequest = { answer(false); close() },
+                title = { androidx.compose.material3.Text(title) },
+                text = { androidx.compose.material3.Text(describe(perms, origins)) },
+                confirmButton = { androidx.compose.material3.TextButton({ answer(true); close() }) { androidx.compose.material3.Text(allow) } },
+                dismissButton = { androidx.compose.material3.TextButton({ answer(false); close() }) { androidx.compose.material3.Text("Cancelar") } })
+        }
+        return r
+    }
+
+    /** Quita un permiso opcional ya concedido (pantalla de extensiones, #70). */
+    fun removeOptional(e: WebExtension, perm: String?, origin: String?) {
+        controller.removeOptionalPermissions(e.id, perm?.let { arrayOf(it) } ?: emptyArray(), origin?.let { arrayOf(it) } ?: emptyArray(), emptyArray())
+            .accept({ refresh() }, { err -> android.util.Log.w("Brisa", "removeOptionalPermissions ${e.id}", err); refresh() })
+    }
+
+    /** Nombre legible de un permiso opcional concedido. */
+    fun permLabel(perm: String?, origin: String?): String =
+        perm?.let { PERM_NAMES[it] ?: it } ?: origin?.let { if (it == "<all_urls>" || it.startsWith("*://*/")) "todas las webs" else History.hostOf(it.replace("*.", "")).ifEmpty { it } } ?: ""
 
 }

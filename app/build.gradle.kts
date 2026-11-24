@@ -10,8 +10,8 @@ android {
         applicationId = "es.homelab.brisa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 117
-        versionName = "1.1.4"
+        versionCode = 118
+        versionName = "1.1.5"
         // Solo arm64: el Pixel no necesita más y el APK pesa la mitad
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -44,7 +44,7 @@ android {
 
 dependencies {
     // Motor Gecko (Firefox). Versión exacta: la comprueba cada día .github/workflows/gecko.yml
-    implementation("org.mozilla.geckoview:geckoview:160.0.20261104181552")
+    implementation("org.mozilla.geckoview:geckoview:160.0.20261116130455")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")

@@ -56,10 +56,31 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.mozilla.geckoview.GeckoView
 
+/**
+ * Pestañas y estado de la pantalla, fuera de la Activity (#74): si Android la destruye y la vuelve a crear sin matar
+ * el proceso (idioma, tamaño de letra, «No mantener actividades»), las pestañas siguen ahí con sus sesiones abiertas,
+ * privadas incluidas, en vez de duplicarse o quedarse huérfanas.
+ */
+object TabStore {
+    val tabs = mutableStateListOf<Tab>()
+    var current by mutableIntStateOf(0)
+    var ui = UiState()
+    /** Ya se han cargado en este proceso: una Activity nueva las reutiliza tal cual. */
+    var loaded = false
+
+    /** Salida de verdad (la Activity termina): se cierran todas las sesiones. */
+    fun closeAll() {
+        tabs.forEach { runCatching { if (it.session.isOpen) it.session.close() } }
+        tabs.clear(); current = 0; ui = UiState(); loaded = false
+    }
+}
+
 class MainActivity : ComponentActivity(), TabHost, PromptHost {
-    private val tabs = mutableStateListOf<Tab>()
-    private var current by mutableIntStateOf(0)
-    private val ui = UiState()
+    private val tabs get() = TabStore.tabs
+    private var current: Int
+        get() = TabStore.current
+        set(v) { TabStore.current = v }
+    private val ui get() = TabStore.ui
 
     override fun openTab(tab: Tab) { tabs.add(current + 1, tab); current += 1 }
     override fun closeTab(tab: Tab) {
@@ -184,23 +205,36 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
         Downloads.load(this)
         Engine.get(this)
         // «Borrar datos al salir»: si quedó pendiente (la app se cerró sin pasar por onDestroy), se borra ahora
-        val wipe = Privacy.clearOnExit
-        if (wipe) { Privacy.clearAll(this); tabsFile.delete() }
-        // Pestañas de la última vez, con su historial atrás/adelante
-        runCatching {
-            val a = org.json.JSONArray(tabsFile.readText())
-            for (i in 0 until a.length()) a.getJSONObject(i).let {
-                tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null },
-                    group = it.optString("group").ifEmpty { null }, lazy = true, id = it.optString("id").ifEmpty { null })
-                    // Su miniatura de la última vez, del disco (#58)
-                    .also { t -> Thumbs.load(this, t.id) { b -> if (t.thumb == null) t.thumb = b } }
+        // #74: Android ha recreado la pantalla con el proceso vivo: las pestañas siguen en TabStore, con sus sesiones.
+        // No se borra nada ni se vuelven a cargar del disco.
+        val recreated = TabStore.loaded
+        if (recreated) ui.fullScreen = false
+        if (!recreated) {
+            // Solo en un arranque de verdad. Si la app se cerró sin pasar por onDestroy, el borrado pendiente se hace ahora
+            if (Privacy.clearOnExit) { Privacy.clearAll(this); tabsFile.delete() }
+            var active = -1
+            // Pestañas de la última vez, con su historial atrás/adelante
+            runCatching {
+                val a = org.json.JSONArray(tabsFile.readText())
+                for (i in 0 until a.length()) a.getJSONObject(i).let {
+                    tabs += Tab(this, false, it.optString("url"), it.optString("state").ifEmpty { null },
+                        group = it.optString("group").ifEmpty { null }, lazy = true, id = it.optString("id").ifEmpty { null })
+                        // Su miniatura de la última vez, del disco (#58)
+                        .also { t -> Thumbs.load(this, t.id) { b -> if (t.thumb == null) t.thumb = b } }
+                    if (it.optBoolean("activa")) active = tabs.lastIndex
+                }
             }
+            Thumbs.prune(this, tabs.map { it.id }.toSet())
+            TabStore.loaded = true
+            // La pestaña que se estaba viendo (#74); si no se sabe, la última
+            current = if (active >= 0) active else tabs.lastIndex.coerceAtLeast(0)
         }
-        Thumbs.prune(this, tabs.map { it.id }.toSet())
-        val incoming = intent?.dataString?.let(::safeIncoming) ?: fromNotification(intent)
-        if (incoming != null) tabs += Tab(this, false, incoming)
-        if (tabs.isEmpty()) tabs += Tab(this, false, null)
-        current = tabs.lastIndex
+        // El enlace o la notificación con que se abrió Brisa, solo la primera vez: al recrear la pantalla
+        // Android repite el mismo intent y añadiría otra pestaña igual (#74)
+        val incoming = if (savedInstanceState == null) intent?.dataString?.let(::safeIncoming) ?: fromNotification(intent) else null
+        if (incoming != null) { tabs += Tab(this, false, incoming); current = tabs.lastIndex }
+        if (tabs.isEmpty()) { tabs += Tab(this, false, null); current = 0 }
+        current = current.coerceIn(0, tabs.lastIndex)
         // La frecuencia de pantalla la decide Android (sube a 90/120 Hz al moverse y baja con la página quieta,
         // que es como ahorra batería). Forzar el modo máximo lo impedía (#22).
         // Pestaña nueva ya preparada:
@@ -220,6 +254,7 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent) // #74: si Android recrea la pantalla, que no vuelva a usar el intent viejo
         wipeIfAway()
         if (intent.hasExtra(WebNotifs.EXTRA_TAG)) {
             fromNotification(intent)?.let { tabs += Tab(this, false, it); current = tabs.lastIndex }
@@ -243,7 +278,14 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
     }
 
     override fun onDestroy() {
-        if (isFinishing && Privacy.clearOnExit) { Privacy.clearAll(this); tabsFile.delete() }
+        if (isFinishing) {
+            // Salida de verdad (quitada de Recientes…): las sesiones se cierran para que no sigan abiertas sin
+            // pantalla (memoria, audio que no se puede parar, #74). Las normales ya están guardadas en onPause.
+            if (Privacy.clearOnExit) { Privacy.clearAll(this); tabsFile.delete() }
+            TabStore.closeAll()
+        }
+        // Si no termina, Android la está recreando: las pestañas siguen en TabStore para la Activity nueva
+        if (Tab.tabHost === this) Tab.tabHost = null
         super.onDestroy()
     }
 
@@ -310,8 +352,10 @@ class MainActivity : ComponentActivity(), TabHost, PromptHost {
 
     private fun saveTabs() {
         val a = org.json.JSONArray()
+        val shown = tabs.getOrNull(current)
         tabs.filter { !it.private && !it.isHome }.forEach {
-            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: "").put("id", it.id))
+            a.put(org.json.JSONObject().put("url", it.url).put("state", it.state ?: "").put("group", it.group ?: "").put("id", it.id)
+                .put("activa", it === shown)) // #74: volver a la misma pestaña tras recrear o «Reiniciar Brisa»
         }
         if (!Privacy.clearOnExit) runCatching { tabsFile.writeText(a.toString()) }
     }
@@ -375,6 +419,8 @@ fun Browser(tabs: SnapshotStateList<Tab>, current: Int, select: (Int) -> Unit, u
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
         }
     }
+    // #74: al destruirse esta pantalla, la vista suelta la sesión para que la de la Activity nueva pueda usarla
+    DisposableEffect(geckoView) { onDispose { runCatching { geckoView.releaseSession() } } }
     val favs = remember { Favorites(ctx) }
     val scope = rememberCoroutineScope()
     /** Pestaña cuya sesión tiene ahora la vista (cambia en LaunchedEffect(tab), después de que cambie tab). */

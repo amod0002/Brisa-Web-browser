@@ -350,3 +350,12 @@ Repasar antes de pasar una versión de `dev` a `main` y etiquetarla. Marca con [
 - [ ] https://mixed.badssl.com: candado abierto («segura solo en parte»).
 - [ ] Ir de una web https a una http y volver con Atrás/Adelante: el icono cambia cada vez y nunca se queda el anterior. En m.youtube.com, navegar entre vídeos: el candado no desaparece.
 - [ ] Barra encogida al bajar: se ve el icono correcto (candado / tachado / rojo).
+
+## 36. Novedades 1.1.5 · Gecko 160.0.20261116130455 e issues #68, #70, #71, #74
+- [ ] Repaso rápido: instalar encima conservando datos; uBlock activo; YouTube; Maps; login del homelab; una descarga; modo lectura.
+- [ ] Extensiones → «Buscar actualizaciones»: dice «Todas las extensiones están al día» o cuáles se han actualizado. Con una versión antigua instalada desde su página de versiones en AMO, pasa a la última.
+- [ ] Una extensión que pida un permiso opcional desde sus opciones: sale el diálogo de Brisa; al aceptar, la función va. En su ficha aparece en «Permisos concedidos después de instalar» y «Quitar» lo retira.
+- [ ] DNS cifrado en «Estricto»: VPN on/off y Wi-Fi ↔ datos navegando; las webs siguen cargando (y, si se puede, ninguna consulta en el registro del DNS de la red).
+- [ ] Opciones de desarrollador → «No mantener actividades»: abrir un enlace desde otra app, ir a Inicio y volver varias veces → solo una pestaña con ese enlace.
+- [ ] Una privada abierta y una radio sonando en otra pestaña; cambiar el tamaño de letra del sistema: la privada sigue y no hay audio duplicado.
+- [ ] 5 pestañas viendo la 2.ª, «Reiniciar Brisa»: vuelve a la 2.ª. Quitar Brisa de Recientes con audio sonando: se para.

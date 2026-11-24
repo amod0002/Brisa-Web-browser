@@ -64,7 +64,7 @@ La mayoría de navegadores de Android usan Chromium. Brisa usa **Gecko** (GeckoV
 
 ## Novedades
 
-**1.1.4**: extensiones (uBlock, Bitwarden…), páginas de error con certificados del homelab y aviso «No seguro» estilo Firefox/Chrome.
+**1.1.5**: motor Gecko 160 con los últimos parches de seguridad de Mozilla y extensiones que se actualizan solas.
 
 El historial completo está en [CHANGELOG.md](CHANGELOG.md).
 

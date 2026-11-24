@@ -91,8 +91,14 @@ object Engine {
             override fun onUpdatePrompt(
                 ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
             ): GeckoResult<AllowOrDeny> =
-                // Una actualización que pide permisos nuevos solo se acepta sola para uBlock
-                GeckoResult.fromValue(if (ext.id == UBLOCK_ID) AllowOrDeny.ALLOW else AllowOrDeny.DENY)
+                // Una actualización que pide permisos nuevos: uBlock se acepta sola; las demás se preguntan (#68)
+                if (ext.id == UBLOCK_ID) GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                else Extensions.askPermissions("«${ext.metaData.name ?: ext.id}» tiene una versión nueva que pide más permisos", perms, origins, "Actualizar")
+            // #70: permisos que una extensión pide más tarde (browser.permissions.request), al activar una función
+            override fun onOptionalPrompt(
+                ext: WebExtension, perms: Array<String>, origins: Array<String>, data: Array<String>
+            ): GeckoResult<AllowOrDeny> =
+                Extensions.askPermissions("«${ext.metaData.name ?: ext.id}» pide permiso", perms, origins)
         }
     }
 
@@ -165,8 +171,14 @@ interface TabHost {
  * [restore]: estado guardado (historial atrás/adelante incluido).
  * [openNow] = false cuando Gecko nos pide una sesión para un enlace «abrir en ventana nueva»: él la abre.
  */
-class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null,
+class Tab(context: Context, val private: Boolean, startUrl: String?, restore: String? = null, openNow: Boolean = true, group: String? = null,
           lazy: Boolean = false, id: String? = null) {
+    /**
+     * Contexto: siempre la pantalla de Brisa que haya ahora (#74). Las pestañas viven en TabStore y sobreviven a que
+     * Android recree la Activity; guardar aquí la Activity con la que se crearon dejaría colgada la vieja.
+     */
+    private val appCtx: Context = context.applicationContext
+    private val ctx: Context get() = (tabHost as? Context) ?: appCtx
     /** Id estable (se guarda en pestanas.json): nombre de su miniatura en disco (#58). */
     val id: String = id ?: java.util.UUID.randomUUID().toString()
     /** La página ya ha pintado algo: hasta entonces se tapa la vista para no ver la pestaña anterior (#55). */
@@ -250,7 +262,7 @@ class Tab(private val ctx: Context, val private: Boolean, startUrl: String?, res
     var desktop by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
     /** Ventanas de la web (alert, confirm…), con el bloqueo de diálogos en bucle (#21) por pestaña. */
-    private val prompts = Prompts(ctx, { tabHost as? PromptHost }) { url }
+    private val prompts = Prompts(appCtx, { tabHost as? PromptHost }) { url }
     var readerable by mutableStateOf(false)
     /** Permiso de rastreo de la web actual. ALLOW = protección desactivada en esta web. */
     var trackingPerm by mutableStateOf<GeckoSession.PermissionDelegate.ContentPermission?>(null)
